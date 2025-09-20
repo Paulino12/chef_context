@@ -33,10 +33,13 @@ export default function Home() {
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
+      a.href = url;
+      a.download = filename;
+      a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert(`Error: ${e?.message || e}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(`Error: ${msg}`);
     } finally {
       setBusy(false);
     }
@@ -44,19 +47,34 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-xl p-6">
-      <h1 className="text-2xl font-semibold mb-4">Henbrook Daily Menu Generator</h1>
+      <h1 className="text-2xl font-semibold mb-4">
+        Henbrook Daily Menu Generator
+      </h1>
 
       <label className="block mb-3">
         Weekly menu DOCX
-        <input type="file" accept=".docx" onChange={(e) => setWeekly(e.target.files?.[0] ?? null)} />
+        <input
+          type="file"
+          accept=".docx"
+          onChange={(e) => setWeekly(e.target.files?.[0] ?? null)}
+        />
       </label>
 
       <div className="flex gap-4 items-center mb-4">
-        <label>Single date:&nbsp;
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <label>
+          Single date:&nbsp;
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" checked={allDays} onChange={(e) => setAllDays(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={allDays}
+            onChange={(e) => setAllDays(e.target.checked)}
+          />
           All 7 days
         </label>
       </div>
