@@ -1,30 +1,37 @@
-import Link from "next/link";
+"use client";
 
+import { NavLink } from "./nav-link";
+
+/**
+ * Sidebar is visible from md+ (desktop/tablet).
+ * In mobile we show <MobileNav/> instead (sheet drawer).
+ */
 export function AppSidebar() {
   return (
-    <nav className="p-4 text-sm space-y-2">
-      <div className="text-xs uppercase text-muted-foreground mb-1">Tools</div>
-      
-      <Link
-        href="/dashboard/tools/menu-generator"
-        className="px-3 py-2 text-sm hover:underline"
-      >
-        Menu Generator
-      </Link>
-      {/* <a className="block px-2 py-1 rounded hover:bg-muted opacity-60" href="/dashboard/tools/invoices">
-        Invoices (soon)
-      </a> */}
-
-      <div className="text-xs uppercase text-muted-foreground mt-4 mb-1">
-        Resources
+    <nav className="p-4 text-sm space-y-3">
+      <div>
+        <div className="mb-1 text-xs uppercase text-muted-foreground">Tools</div>
+        <div className="space-y-1">
+          <NavLink href="/dashboard">
+            Dashboard
+          </NavLink>
+          <NavLink href="/dashboard/tools/menu-generator" startsWith>
+            Menu Generator
+          </NavLink>
+          {/* <NavLink href="/dashboard/tools/invoices" startsWith>Invoices</NavLink> */}
+        </div>
       </div>
-      {/* <a
-        className="block px-2 py-1 rounded hover:bg-muted"
-        href="https://github.com/Paulino12/generate-menus#readme"
-        target="_blank"
-      >
-        Docs
-      </a> */}
+
+      <div>
+        <div className="mt-4 mb-1 text-xs uppercase text-muted-foreground">Resources</div>
+        <a
+          className="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-muted"
+          href="https://github.com/Paulino12/generate-menus#readme"
+          target="_blank" rel="noreferrer"
+        >
+          Docs
+        </a>
+      </div>
     </nav>
   );
 }
