@@ -95,7 +95,6 @@ export default function MenuGeneratorPage() {
   const submit = async () => {
     if (!weekly) return alert("Upload the weekly DOCX first.");
 
-    // Build form data
     const fd = new FormData();
     fd.append("weekly", weekly);
 
@@ -107,23 +106,42 @@ export default function MenuGeneratorPage() {
       fd.append("date", toYMDLocal(chosen));
     }
 
+    // Optional: cancel in-flight if component unmounts
+    const ctrl = new AbortController();
     setDownloading(true);
     try {
-      const res = await fetch("/api/generate", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(await res.text());
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: fd,
+        cache: "no-store", // <-- avoid caching issues
+        signal: ctrl.signal,
+      });
 
-      const blob = await res.blob();
+      if (!res.ok) {
+        throw new Error((await res.text()) || "Generation failed");
+      }
+
+      // Get filename from Content-Disposition if available
       const cd = res.headers.get("content-disposition");
-      const name: string =
+      const name =
         filenameFromContentDisposition(cd) ??
         (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
 
+      // Buffer the file and trigger a download
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+
       const a = document.createElement("a");
       a.href = url;
       a.download = name;
+
+      // Append to DOM so click is honored by all browsers
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+
+      // Revoke after a short delay so the browser has consumed the URL
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -132,6 +150,8 @@ export default function MenuGeneratorPage() {
           ? err
           : "Generation failed";
       alert(msg);
+    } finally {
+      setDownloading(false); // <-- reliably flips the button back
     }
   };
 

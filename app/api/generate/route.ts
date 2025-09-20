@@ -1,27 +1,26 @@
 export const runtime = "nodejs";
-type NodeFetchInit = RequestInit & { duplex?: "half" };
 
 export async function POST(req: Request) {
   const api = process.env.FASTAPI_URL!;
-  const target = `${api.replace(/\/+$/, "")}/generate`;
+  const target = api.replace(/\/+$/, "") + "/generate";
 
   const form = await req.formData();
-  const res = await fetch(target, {
+  const upstream = await fetch(target, {
     method: "POST",
     body: form,
+    // @ts-expect-error: Node fetch streaming
     duplex: "half",
-  } as NodeFetchInit);
+  });
 
-  if (!res.ok) return new Response(await res.text(), { status: res.status });
+  if (!upstream.ok) {
+    return new Response(await upstream.text(), { status: upstream.status });
+  }
 
-  // Pass upstream headers straight through
+  // Pass through headers and force no-store
   const headers = new Headers();
-  // copy all headers from upstream
-  res.headers.forEach((v, k) => headers.set(k, v));
-  // ensure content-type at least
-  if (!headers.get("content-type"))
-    headers.set("content-type", "application/zip");
-  // DO NOT set a default content-disposition here if upstream provided it
+  upstream.headers.forEach((v, k) => headers.set(k, v));
+  if (!headers.get("content-type")) headers.set("content-type", "application/zip");
+  headers.set("cache-control", "no-store");  // <-- important in prod
 
-  return new Response(res.body, { status: res.status, headers });
+  return new Response(upstream.body, { status: upstream.status, headers });
 }
