@@ -1,11 +1,3 @@
-import { id } from "date-fns/locale";
-import dynamic from "next/dynamic";
-
-// interface Tool {
-//   title: string;
-//   description: string;
-//   href: string;
-// }
 
 export const TOOLS = [
   {

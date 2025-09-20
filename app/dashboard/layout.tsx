@@ -3,7 +3,6 @@ import { AppHeader } from "../components/app-header";
 import { AppSidebar } from "../components/app-sidebar";
 import { MobileNav } from "../components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
-import { LAYOUT } from "../lib/ui";
 
 /**
  * Responsive grid:

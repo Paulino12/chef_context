@@ -72,13 +72,6 @@ export default function MenuGeneratorPage() {
   // The chosen day if mode === "one"
   const [date, setDate] = useState<Date | undefined>(undefined);
 
-  // Do not generate if a date is not picked
-  // (either from dropdown or calendar)
-  // const canGenerate = mode === "seven" || (!!date && !!weekly);
-  const [chosenDate, setChosenDate] = useState<string | undefined>(
-    "choose a date"
-  );
-
   // Calendar popover state (fallback if filename had no date)
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -101,9 +94,6 @@ export default function MenuGeneratorPage() {
 
   const submit = async () => {
     if (!weekly) return alert("Upload the weekly DOCX first.");
-    // if (chosenDate) { setDate(chosenDate); }
-    if (mode === "one" && chosenDate === "Choose a date")
-      return alert("Pick a date from the list."); // should not happen
 
     // Build form data
     const fd = new FormData();
@@ -124,7 +114,7 @@ export default function MenuGeneratorPage() {
 
       const blob = await res.blob();
       const cd = res.headers.get("content-disposition");
-      const name =
+      const name: string =
         filenameFromContentDisposition(cd) ??
         (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
 
@@ -134,10 +124,14 @@ export default function MenuGeneratorPage() {
       a.download = name;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      alert(e?.message || "Generation failed");
-    } finally {
-      setDownloading(false);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : "Generation failed";
+      alert(msg);
     }
   };
 
