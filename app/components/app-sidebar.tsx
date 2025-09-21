@@ -18,7 +18,9 @@ export function AppSidebar() {
           <NavLink href="/dashboard/tools/menu-generator" startsWith>
             Menu Generator
           </NavLink>
-          {/* <NavLink href="/dashboard/tools/invoices" startsWith>Invoices</NavLink> */}
+          <NavLink href="/dashboard/tools/invoice-analyzer" startsWith>
+            Invoice Analyzer
+          </NavLink>
         </div>
       </div>
 

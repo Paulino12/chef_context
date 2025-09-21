@@ -22,7 +22,7 @@ export function AppHeader({ start }: { start?: ReactNode }) {
       <div className="flex items-center gap-2">
         {start /* e.g., <MobileNav /> shows only on mobile */}
         <NavLink
-          href="/dashboard"
+          href="/"
           className="px-0 py-0 text-base font-semibold hover:bg-transparent"
         >
           Chef Context
