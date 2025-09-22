@@ -166,8 +166,14 @@ export default function InvoiceAnalyzerUpload() {
       setCsv(json.csv ?? null);
       setTotals(sortTotals(json.totals ?? []));
       setSummary(json.summary ?? null);
-    } catch (e: any) {
-      setErr(e?.message || String(e));
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : "Analysis failed";
+      alert(msg);
     } finally {
       setBusy(false);
     }
@@ -417,8 +423,16 @@ export default function InvoiceAnalyzerUpload() {
                       <XAxis dataKey="supplier" tick={{ fontSize: 12 }} />
                       <YAxis tickFormatter={(v) => gbp.format(v)} width={80} />
                       <Tooltip
-                        formatter={(value: any) => fmtGBP(Number(value))}
-                        labelFormatter={(label) => `Supplier: ${label}`}
+                        formatter={(value: unknown) => {
+                          const n =
+                            typeof value === "number"
+                              ? value
+                              : Number(value as unknown);
+                          return fmtGBP(Number.isFinite(n) ? n : 0);
+                        }}
+                        labelFormatter={(label: unknown) =>
+                          `Supplier: ${String(label)}`
+                        }
                       />
                       <Bar dataKey="diff">
                         <LabelList
