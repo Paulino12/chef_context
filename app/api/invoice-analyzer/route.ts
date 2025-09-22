@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "No file uploaded (field 'file')." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No file uploaded (field 'file')." },
+        { status: 400 }
+      );
     }
 
     const fdata = new FormData();
@@ -27,12 +30,18 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return NextResponse.json({ error: err.error || "Backend error" }, { status: res.status });
+      return NextResponse.json(
+        { error: err.error || "Backend error" },
+        { status: res.status }
+      );
     }
 
     const json = await res.json();
     return NextResponse.json(json);
   } catch (e: unknown) {
-    return NextResponse.json({ error: `${e instanceof Error ? e.message : String(e)}` }, { status: 500 });
+    return NextResponse.json(
+      { error: `${e instanceof Error ? e.message : String(e)}` },
+      { status: 500 }
+    );
   }
 }

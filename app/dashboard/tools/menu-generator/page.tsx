@@ -21,6 +21,14 @@ import {
 import { ChevronDownIcon } from "lucide-react";
 import { LAYOUT } from "@/app/lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 /* ---------------- Utilities (unchanged from your version) ----------------- */
 const toYMDLocal = (d: Date) =>
@@ -167,129 +175,138 @@ export default function MenuGeneratorPage() {
           ease: "easeInOut",
         }}
         className={[
-          "mx-auto w-1/2",
+          "mx-auto max-w-5xl space-y-8",
           LAYOUT.CONTENT_MAX_W, // max width scales at lg
           LAYOUT.SECTION_GAP,
         ].join(" ")}
       >
-        <h1 className="text-2xl font-semibold">Daily Menu Generator</h1>
-
-        {/* Upload (full width) */}
-        <section className="space-y-2">
-          <Label htmlFor="weekly">Weekly menu (.docx)</Label>
-          <Input
-            id="weekly"
-            type="file"
-            accept=".docx"
-            onChange={(e) => {
-              setWeekly(e.target.files?.[0] ?? null);
-              setDate(undefined);
-            }}
-            className="w-full cursor-pointer font-semibold"
-          />
-          <p className="text-xs text-muted-foreground">
-            Tip: filenames like <code>...WC 22-09-2025.docx</code> will
-            auto-fill the week.
-          </p>
-        </section>
-
-        {/* Mode selector: responsive 2-up from sm+ */}
-        <section className="space-y-2">
-          <Label>What would you like to generate?</Label>
-          <RadioGroup
-            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
-            value={mode}
-            onValueChange={(v) => setMode(v as "one" | "seven")}
-          >
-            <div className="flex items-center gap-2 rounded-md border p-2">
-              <RadioGroupItem id="mode-one" value="one" />
-              <Label htmlFor="mode-one" className="cursor-pointer">
-                One day
-              </Label>
-            </div>
-            <div className="flex items-center gap-2 rounded-md border p-2">
-              <RadioGroupItem id="mode-seven" value="seven" />
-              <Label htmlFor="mode-seven" className="cursor-pointer">
-                All 7 days
-              </Label>
-            </div>
-          </RadioGroup>
-        </section>
-
-        {/* Day picker: dropdown of 7 days OR calendar fallback (only when mode==="one") */}
-        {mode === "one" &&
-          (parsedWeek ? (
+        <Card className="border">
+          <CardHeader>
+            <CardTitle>Daily Menu Generator</CardTitle>
+            <CardDescription>
+              Upload your weekly DOCX and get daily menus in return.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Upload (full width) */}
             <section className="space-y-2">
-              <Label>Pick a day (from the uploaded week)</Label>
-              <Select
-                value={
-                  date
-                    ? toYMDLocal(date)
-                    : parsedWeek
-                    ? toYMDLocal(parsedWeek[0]) // Show Monday if none picked yet
-                    : undefined
-                }
-                onValueChange={(val) => setDate(fromYMD(val))}
-              >
-                <SelectTrigger className="w-full cursor-pointer">
-                  <SelectValue placeholder="Choose a date" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parsedWeek.map((d) => {
-                    const value = toYMDLocal(d);
-                    return (
-                      <SelectItem
-                        key={value}
-                        value={value}
-                        className="cursor-pointer"
-                      >
-                        {prettyOption(d)}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </section>
-          ) : (
-            <section className="space-y-2">
-              <Label>Date (single day)</Label>
-              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full sm:w-60 justify-between font-normal cursor-pointer"
-                  >
-                    {date ? toYMDLocal(date) : "Select date"}
-                    <ChevronDownIcon className="size-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    captionLayout="dropdown"
-                    onSelect={(d) => {
-                      setDate(d ?? undefined);
-                      setCalendarOpen(false);
-                    }}
-                    className="p-2"
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="weekly">Weekly menu (.docx)</Label>
+              <Input
+                id="weekly"
+                type="file"
+                accept=".docx"
+                onChange={(e) => {
+                  setWeekly(e.target.files?.[0] ?? null);
+                  setDate(undefined);
+                }}
+                className="w-full cursor-pointer font-semibold"
+              />
               <p className="text-xs text-muted-foreground">
-                We couldn’t detect a date in the filename — please pick a day.
+                Tip: filenames like <code>...WC 22-09-2025.docx</code> will
+                auto-fill the week.
               </p>
             </section>
-          ))}
 
-        {/* Generate button: full width on mobile, natural width from sm+ */}
-        <Button
-          className="w-full cursor-pointer"
-          onClick={submit}
-          disabled={downloading}
-        >
-          {downloading ? "Generating…" : "Generate"}
-        </Button>
+            {/* Mode selector: responsive 2-up from sm+ */}
+            <section className="space-y-2">
+              <Label>What would you like to generate?</Label>
+              <RadioGroup
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                value={mode}
+                onValueChange={(v) => setMode(v as "one" | "seven")}
+              >
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <RadioGroupItem id="mode-one" value="one" />
+                  <Label htmlFor="mode-one" className="cursor-pointer">
+                    One day
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border p-2">
+                  <RadioGroupItem id="mode-seven" value="seven" />
+                  <Label htmlFor="mode-seven" className="cursor-pointer">
+                    All 7 days
+                  </Label>
+                </div>
+              </RadioGroup>
+            </section>
+
+            {/* Day picker: dropdown of 7 days OR calendar fallback (only when mode==="one") */}
+            {mode === "one" &&
+              (parsedWeek ? (
+                <section className="space-y-2">
+                  <Label>Pick a day (from the uploaded week)</Label>
+                  <Select
+                    value={
+                      date
+                        ? toYMDLocal(date)
+                        : parsedWeek
+                        ? toYMDLocal(parsedWeek[0]) // Show Monday if none picked yet
+                        : undefined
+                    }
+                    onValueChange={(val) => setDate(fromYMD(val))}
+                  >
+                    <SelectTrigger className="w-full cursor-pointer">
+                      <SelectValue placeholder="Choose a date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parsedWeek.map((d) => {
+                        const value = toYMDLocal(d);
+                        return (
+                          <SelectItem
+                            key={value}
+                            value={value}
+                            className="cursor-pointer"
+                          >
+                            {prettyOption(d)}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </section>
+              ) : (
+                <section className="space-y-2">
+                  <Label>Date (single day)</Label>
+                  <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-60 justify-between font-normal cursor-pointer"
+                      >
+                        {date ? toYMDLocal(date) : "Select date"}
+                        <ChevronDownIcon className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        captionLayout="dropdown"
+                        onSelect={(d) => {
+                          setDate(d ?? undefined);
+                          setCalendarOpen(false);
+                        }}
+                        className="p-2"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    We couldn’t detect a date in the filename — please pick a
+                    day.
+                  </p>
+                </section>
+              ))}
+
+            {/* Generate button: full width on mobile, natural width from sm+ */}
+            <Button
+              className="w-full cursor-pointer"
+              onClick={submit}
+              disabled={downloading}
+            >
+              {downloading ? "Generating…" : "Generate"}
+            </Button>
+          </CardContent>
+        </Card>
       </motion.main>
     </AnimatePresence>
   );

@@ -45,6 +45,8 @@ import {
   Tooltip,
   LabelList,
 } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
+import { LAYOUT } from "@/app/lib/ui";
 
 /* ----------------------------- Types & Helpers ----------------------------- */
 
@@ -248,299 +250,320 @@ export default function InvoiceAnalyzerUpload() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      {/* Uploader Card */}
-      <Card className="border">
-        <CardHeader>
-          <CardTitle>Invoice Analyzer</CardTitle>
-          <CardDescription>
-            Upload Pelican Pi ZIP of .xlsx invoices.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {/* File chooser + Analyze button */}
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-            <div className="space-y-2">
-              <Label htmlFor="zip" className="cursor-pointer">
-                Choose file
-              </Label>
-              <Input
-                id="zip"
-                type="file"
-                accept=".zip"
-                ref={fileInputRef} // <-- add this
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="cursor-pointer font-bold"
-              />
-            </div>
-
-            <Button
-              size="lg"
-              className="sm:ml-3 cursor-pointer"
-              disabled={!file || busy}
-              onClick={onAnalyze}
-            >
-              {busy ? "Analyzing…" : "Analyze ZIP"}
-            </Button>
-          </div>
-
-          {/* Error message (if any) */}
-          {err && <p className="text-sm text-red-600">{err}</p>}
-
-          {/* Summary tiles (only after analysis) */}
-          {summary && (
-            <>
-              <Separator className="my-2" />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Card>
-                  <CardHeader className="p-3">
-                    <CardDescription>Invoices (whitelist)</CardDescription>
-                    <CardTitle className="text-2xl">
-                      {summary?.invoices_loaded ?? 0}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="p-3">
-                    <CardDescription>Credits</CardDescription>
-                    <CardTitle className="text-2xl">
-                      {summary?.credits_count ?? 0}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-                <Card>
-                  <CardHeader className="p-3">
-                    <CardDescription>Skipped files</CardDescription>
-                    <CardTitle className="text-2xl">
-                      {summary?.skipped?.length ?? 0}
-                    </CardTitle>
-                  </CardHeader>
-                </Card>
-              </div>
-            </>
-          )}
-        </CardContent>
-
-        <CardFooter className="flex gap-3">
-          <Button
-            variant="secondary"
-            className="cursor-pointer"
-            onClick={onReset}
-          >
-            Reset
-          </Button>
-
-          {/* Download is only shown AFTER we have a CSV from analysis */}
-          {csv && (
-            <Button onClick={onDownloadCsv} className="cursor-pointer">
-              ⬇️ Download henbrook_invoice_analysis.csv
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
-
-      {/* Totals Table (only after analysis) */}
-      {!!totals.length && (
-        <Card>
+    <AnimatePresence>
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          duration: 1,
+          delay: 0.1,
+          ease: "easeInOut",
+        }}
+        // className="mx-auto max-w-5xl space-y-8"
+        className={[
+          "mx-auto max-w-5xl space-y-8",
+          LAYOUT.CONTENT_MAX_W, // max width scales at lg
+          LAYOUT.SECTION_GAP,
+        ].join(" ")}
+      >
+        {/* Uploader Card */}
+        <Card className="border">
           <CardHeader>
-            <CardTitle className="text-base">
-              Top suppliers by amount (signed) — by Supplier &amp; Account
-              Number
-            </CardTitle>
+            <CardTitle>Invoice Analyzer</CardTitle>
+            <CardDescription>
+              Upload Pelican Pi ZIP of .xlsx invoices.
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Supplier</TableHead>
-                    {/* Center these headers per request */}
-                    <TableHead className="text-center">
-                      Account Number
-                    </TableHead>
-                    <TableHead className="text-center">Total</TableHead>
-                    <TableHead className="text-center">Credits</TableHead>
-                    <TableHead className="text-center">Difference</TableHead>
-                  </TableRow>
-                </TableHeader>
+            {/* File chooser + Analyze button */}
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+              <div className="space-y-2">
+                <Label htmlFor="zip" className="cursor-pointer">
+                  Choose file
+                </Label>
+                <Input
+                  id="zip"
+                  type="file"
+                  accept=".zip"
+                  ref={fileInputRef} // <-- add this
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="cursor-pointer font-bold"
+                />
+              </div>
 
-                <TableBody>
-                  {totals.map((r, idx) => (
-                    <TableRow key={idx} className="hover:bg-muted/40">
-                      <TableCell className="whitespace-nowrap">
-                        {r.Supplier}
-                      </TableCell>
-                      {/* Center these cells per request */}
-                      <TableCell className="whitespace-nowrap text-center">
-                        {r["Account Number"]}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {fmtGBP(r.Total)}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {fmtGBP(r.Credits)}
-                      </TableCell>
-                      <TableCell className="text-center tabular-nums">
-                        {fmtGBP(r.Difference)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-
-                  {/* Final total row for Difference */}
-                  <TableRow className="bg-muted/40 font-semibold">
-                    <TableCell className="whitespace-nowrap">TOTAL</TableCell>
-                    <TableCell className="text-center" />
-                    <TableCell className="text-center" />
-                    <TableCell className="text-center" />
-                    <TableCell className="text-center tabular-nums">
-                      {fmtGBP(totalDifference)}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <Button
+                size="lg"
+                className="sm:ml-3 cursor-pointer"
+                disabled={!file || busy}
+                onClick={onAnalyze}
+              >
+                {busy ? "Analyzing…" : "Analyze ZIP"}
+              </Button>
             </div>
 
-            {/* --- NEW: Chart Card (Supplier vs Difference) --- */}
-            <Card className="border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">
-                  Difference by Supplier (chart)
-                </CardTitle>
-                <CardDescription>
-                  Visualising the same order as the table above.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer>
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="supplier" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(v) => gbp.format(v)} width={80} />
-                      <Tooltip
-                        formatter={(value: unknown) => {
-                          const n =
-                            typeof value === "number"
-                              ? value
-                              : Number(value as unknown);
-                          return fmtGBP(Number.isFinite(n) ? n : 0);
-                        }}
-                        labelFormatter={(label: unknown) =>
-                          `Supplier: ${String(label)}`
-                        }
-                      />
-                      <Bar dataKey="diff">
-                        <LabelList
-                          dataKey="diff"
-                          position="top"
-                          formatter={(label: React.ReactNode) => {
+            {/* Error message (if any) */}
+            {err && <p className="text-sm text-red-600">{err}</p>}
+
+            {/* Summary tiles (only after analysis) */}
+            {summary && (
+              <>
+                <Separator className="my-2" />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Card>
+                    <CardHeader className="p-3">
+                      <CardDescription>Invoices</CardDescription>
+                      <CardTitle className="text-2xl">
+                        {summary?.invoices_loaded ?? 0}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-3">
+                      <CardDescription>Credits</CardDescription>
+                      <CardTitle className="text-2xl">
+                        {summary?.credits_count ?? 0}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                  <Card>
+                    <CardHeader className="p-3">
+                      <CardDescription>Skipped files</CardDescription>
+                      <CardTitle className="text-2xl">
+                        {summary?.skipped?.length ?? 0}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                </div>
+              </>
+            )}
+          </CardContent>
+
+          <CardFooter className="flex gap-3">
+            <Button
+              variant="secondary"
+              className="cursor-pointer"
+              onClick={onReset}
+            >
+              Reset
+            </Button>
+
+            {/* Download is only shown AFTER we have a CSV from analysis */}
+            {csv && (
+              <Button onClick={onDownloadCsv} className="cursor-pointer">
+                ⬇️ Download henbrook_invoice_analysis.csv
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+
+        {/* Totals Table (only after analysis) */}
+        {!!totals.length && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Top suppliers by amount invoiced
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader className="bg-muted">
+                    <TableRow>
+                      <TableHead>Supplier</TableHead>
+                      {/* Center these headers per request */}
+                      <TableHead className="text-center">
+                        Account Number
+                      </TableHead>
+                      <TableHead className="text-center">Total</TableHead>
+                      <TableHead className="text-center">Credits</TableHead>
+                      <TableHead className="text-center">Difference</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {totals.map((r, idx) => (
+                      <TableRow key={idx} className="hover:bg-muted/40">
+                        <TableCell className="whitespace-nowrap">
+                          {r.Supplier}
+                        </TableCell>
+                        {/* Center these cells per request */}
+                        <TableCell className="whitespace-nowrap text-center">
+                          {r["Account Number"]}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {fmtGBP(r.Total)}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {fmtGBP(r.Credits)}
+                        </TableCell>
+                        <TableCell className="text-center tabular-nums">
+                          {fmtGBP(r.Difference)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {/* Final total row for Difference */}
+                    <TableRow className="bg-muted/40 font-semibold">
+                      <TableCell className="whitespace-nowrap">TOTAL</TableCell>
+                      <TableCell className="text-center" />
+                      <TableCell className="text-center" />
+                      <TableCell className="text-center" />
+                      <TableCell className="text-center tabular-nums">
+                        {fmtGBP(totalDifference)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* --- NEW: Chart Card (Supplier vs Difference) --- */}
+              <Card className="border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    Difference by Supplier (chart)
+                  </CardTitle>
+                  <CardDescription>
+                    Visualising the same order as the table above.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-72 w-full">
+                    <ResponsiveContainer>
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="supplier" tick={{ fontSize: 12 }} />
+                        <YAxis
+                          tickFormatter={(v) => gbp.format(v)}
+                          width={80}
+                        />
+                        <Tooltip
+                          formatter={(value: unknown) => {
                             const n =
-                              typeof label === "number" ? label : Number(label);
+                              typeof value === "number"
+                                ? value
+                                : Number(value as unknown);
                             return fmtGBP(Number.isFinite(n) ? n : 0);
                           }}
+                          labelFormatter={(label: unknown) =>
+                            `Supplier: ${String(label)}`
+                          }
                         />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                        <Bar dataKey="diff">
+                          <LabelList
+                            dataKey="diff"
+                            position="top"
+                            formatter={(label: React.ReactNode) => {
+                              const n =
+                                typeof label === "number"
+                                  ? label
+                                  : Number(label);
+                              return fmtGBP(Number.isFinite(n) ? n : 0);
+                            }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Budget analysis (front end only) */}
-            <Card className="border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Budget analysis</CardTitle>
-                <CardDescription>
-                  PRPD = Per-Resident-Per-Day. We assume {dim} days in the
-                  current month.
-                </CardDescription>
-              </CardHeader>
+              {/* Budget analysis (front end only) */}
+              <Card className="border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Budget analysis</CardTitle>
+                  <CardDescription>
+                    PRPD = Per-Resident-Per-Day. We assume {dim} days in the
+                    current month.
+                  </CardDescription>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                {/* Inputs: Residents & PRPD */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="residents">Residents</Label>
-                    <Input
-                      id="residents"
-                      type="number"
-                      min={0}
-                      step="1"
-                      inputMode="numeric"
-                      className="cursor-pointer"
-                      value={residents}
-                      onChange={(e) =>
-                        setResidents(parseNumberOrEmpty(e.target.value))
-                      }
-                      placeholder="Enter number of residents"
-                    />
+                <CardContent className="space-y-4">
+                  {/* Inputs: Residents & PRPD */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="residents">Residents</Label>
+                      <Input
+                        id="residents"
+                        type="number"
+                        min={0}
+                        step="1"
+                        inputMode="numeric"
+                        className="cursor-pointer"
+                        value={residents}
+                        onChange={(e) =>
+                          setResidents(parseNumberOrEmpty(e.target.value))
+                        }
+                        placeholder="Enter number of residents"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="prpd">PRPD (£)</Label>
+                      <Input
+                        id="prpd"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        inputMode="decimal"
+                        className="cursor-pointer"
+                        value={prpd}
+                        onChange={(e) =>
+                          setPrpd(parseNumberOrEmpty(e.target.value))
+                        }
+                        placeholder="11.28"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="prpd">PRPD (£)</Label>
-                    <Input
-                      id="prpd"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      inputMode="decimal"
-                      className="cursor-pointer"
-                      value={prpd}
-                      onChange={(e) =>
-                        setPrpd(parseNumberOrEmpty(e.target.value))
-                      }
-                      placeholder="11.28"
-                    />
+                  {/* Results table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Metric</TableHead>
+                          <TableHead className="text-right">Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell>
+                            Monthly budget (Residents × PRPD × {dim} days)
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {fmtGBP(monthlyBudget)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell>
+                            Current spend (total of Difference)
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {fmtGBP(totalDifference)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow className="bg-muted/40 font-semibold">
+                          <TableCell>Current % of monthly budget</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {monthlyBudget
+                              ? `${percentOfBudget.toFixed(2)}%`
+                              : ""}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
                   </div>
-                </div>
-
-                {/* Results table */}
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Metric</TableHead>
-                        <TableHead className="text-right">Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>
-                          Monthly budget (Residents × PRPD × {dim} days)
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmtGBP(monthlyBudget)}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>
-                          Current spend (total of Difference)
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmtGBP(totalDifference)}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow className="bg-muted/40 font-semibold">
-                        <TableCell>Current % of monthly budget</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {monthlyBudget
-                            ? `${percentOfBudget.toFixed(2)}%`
-                            : ""}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+        )}
+      </motion.main>
+    </AnimatePresence>
   );
 }

@@ -7,7 +7,7 @@ export const LAYOUT = {
   SIDEBAR_W: "16rem",
 
   // Page content max-widths at different breakpoints
-  CONTENT_MAX_W: "max-w-[36rem] lg:max-w-[48rem]",
+  CONTENT_MAX_W: "max-w-[36rem] lg:max-w-[64rem] py-8",
 
   // Horizontal padding for pages (scales by breakpoint)
   PAGE_X: "px-4 md:px-6",
