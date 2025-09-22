@@ -1,7 +1,9 @@
-import React from "react";
+import InvoiceAnalyzerUpload from "./components/InvoiceAnalyzerUpload";
 
-const InvoiceAnalyzerPage = () => {
-  return <div>Invoice Analyzer</div>;
-};
-
-export default InvoiceAnalyzerPage;
+export default function Page() {
+  return (
+    <main className="container mx-auto max-w-5xl py-8">
+      <InvoiceAnalyzerUpload />
+    </main>
+  );
+}
