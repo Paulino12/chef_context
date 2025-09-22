@@ -388,322 +388,317 @@ export default function InvoiceAnalyzerUpload() {
   );
 
   return (
-    <AnimatePresence>
-      <motion.main
-        className={[
-          "mx-auto max-w-5xl space-y-8",
-          LAYOUT.CONTENT_MAX_W, // max width scales at lg
-          LAYOUT.SECTION_GAP,
-        ].join(" ")}
-      >
-        {/* Uploader */}
-        <Card className="border">
+    <main
+      className={[
+        "mx-auto max-w-5xl space-y-8",
+        LAYOUT.CONTENT_MAX_W, // max width scales at lg
+        LAYOUT.SECTION_GAP,
+      ].join(" ")}
+    >
+      {/* Uploader */}
+      <Card className="border">
+        <CardHeader>
+          <CardTitle>Invoice Analyzer</CardTitle>
+          <CardDescription>
+            Upload Pelican Pi ZIP of .xlsx invoices.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+            <div className="space-y-2">
+              <Label htmlFor="zip" className="cursor-pointer">
+                Choose file
+              </Label>
+              <Input
+                key={fileKey}
+                id="zip"
+                type="file"
+                accept=".zip"
+                ref={fileRef}
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="cursor-pointer font-bold"
+              />
+            </div>
+
+            <Button
+              size="lg"
+              className="sm:ml-3 cursor-pointer"
+              disabled={!file || busy}
+              onClick={onAnalyze}
+            >
+              {busy ? "Analyzing…" : "Analyze ZIP"}
+            </Button>
+          </div>
+
+          {err && <p className="text-sm text-red-600">{err}</p>}
+
+          {summary && (
+            <>
+              <Separator className="my-2" />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Card>
+                  <CardHeader className="p-3">
+                    <CardDescription>Invoices</CardDescription>
+                    <CardTitle className="text-2xl">
+                      {summary?.invoices_loaded ?? 0}
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="p-3">
+                    <CardDescription>Credits</CardDescription>
+                    <CardTitle className="text-2xl">
+                      {summary?.credits_count ?? 0}
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="p-3">
+                    <CardDescription>Days covered</CardDescription>
+                    <CardTitle className="text-2xl">
+                      {daysCovered ?? 0}
+                    </CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+            </>
+          )}
+        </CardContent>
+
+        <CardFooter className="flex gap-3">
+          <Button
+            variant="secondary"
+            className="cursor-pointer"
+            onClick={onReset}
+          >
+            Reset
+          </Button>
+          {csv && (
+            <Button onClick={onDownloadCsv} className="cursor-pointer">
+              ⬇️ Download invoice analysis
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+
+      {/* Totals + Pleo + Chart + Budget */}
+      {!!totals.length && (
+        <Card>
           <CardHeader>
-            <CardTitle>Invoice Analyzer</CardTitle>
-            <CardDescription>
-              Upload Pelican Pi ZIP of .xlsx invoices.
-            </CardDescription>
+            <CardTitle className="text-base">
+              Top suppliers by amount Number
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-              <div className="space-y-2">
-                <Label htmlFor="zip" className="cursor-pointer">
-                  Choose file
-                </Label>
+            {/* Pleo input (kept above table) */}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="pleo-diff">Pleo card — Difference (£)</Label>
                 <Input
-                  key={fileKey}
-                  id="zip"
-                  type="file"
-                  accept=".zip"
-                  ref={fileRef}
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="cursor-pointer font-bold"
+                  id="pleo-diff"
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  className="cursor-pointer"
+                  value={pleoDiff}
+                  onChange={(e) =>
+                    setPleoDiff(parseNumberOrEmpty(e.target.value))
+                  }
+                  placeholder="Enter Pleo spend (e.g. 125.50)"
                 />
               </div>
-
-              <Button
-                size="lg"
-                className="sm:ml-3 cursor-pointer"
-                disabled={!file || busy}
-                onClick={onAnalyze}
-              >
-                {busy ? "Analyzing…" : "Analyze ZIP"}
-              </Button>
             </div>
 
-            {err && <p className="text-sm text-red-600">{err}</p>}
-
-            {summary && (
-              <>
-                <Separator className="my-2" />
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Card>
-                    <CardHeader className="p-3">
-                      <CardDescription>Invoices</CardDescription>
-                      <CardTitle className="text-2xl">
-                        {summary?.invoices_loaded ?? 0}
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                  <Card>
-                    <CardHeader className="p-3">
-                      <CardDescription>Credits</CardDescription>
-                      <CardTitle className="text-2xl">
-                        {summary?.credits_count ?? 0}
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                  <Card>
-                    <CardHeader className="p-3">
-                      <CardDescription>Days covered</CardDescription>
-                      <CardTitle className="text-2xl">
-                        {daysCovered ?? 0}
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                </div>
-              </>
-            )}
-          </CardContent>
-
-          <CardFooter className="flex gap-3">
-            <Button
-              variant="secondary"
-              className="cursor-pointer"
-              onClick={onReset}
-            >
-              Reset
-            </Button>
-            {csv && (
-              <Button onClick={onDownloadCsv} className="cursor-pointer">
-                ⬇️ Download invoice analysis
-              </Button>
-            )}
-          </CardFooter>
-        </Card>
-
-        {/* Totals + Pleo + Chart + Budget */}
-        {!!totals.length && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Top suppliers by amount Number
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {/* Pleo input (kept above table) */}
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="pleo-diff">Pleo card — Difference (£)</Label>
-                  <Input
-                    id="pleo-diff"
-                    type="number"
-                    step="0.01"
-                    inputMode="decimal"
-                    className="cursor-pointer"
-                    value={pleoDiff}
-                    onChange={(e) =>
-                      setPleoDiff(parseNumberOrEmpty(e.target.value))
-                    }
-                    placeholder="Enter Pleo spend (e.g. 125.50)"
-                  />
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted">
-                      <TableHead>Supplier</TableHead>
-                      <TableHead className="text-center">
-                        Account Number
-                      </TableHead>
-                      <TableHead className="text-center">Total</TableHead>
-                      <TableHead className="text-center">Credits</TableHead>
-                      <TableHead className="text-center">Difference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {totals.map((r, idx) => (
-                      <TableRow key={idx} className="hover:bg-muted/40">
-                        <TableCell className="whitespace-nowrap">
-                          {r.Supplier}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-center">
-                          {r["Account Number"]}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums">
-                          {fmtGBP(r.Total)}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums">
-                          {fmtGBP(r.Credits)}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums">
-                          {fmtGBP(r.Difference)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/40 font-semibold">
-                      <TableCell className="whitespace-nowrap">TOTAL</TableCell>
-                      <TableCell className="text-center" />
-                      <TableCell className="text-center" />
-                      <TableCell className="text-center" />
+            {/* Table */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted">
+                    <TableHead>Supplier</TableHead>
+                    <TableHead className="text-center">
+                      Account Number
+                    </TableHead>
+                    <TableHead className="text-center">Total</TableHead>
+                    <TableHead className="text-center">Credits</TableHead>
+                    <TableHead className="text-center">Difference</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {totals.map((r, idx) => (
+                    <TableRow key={idx} className="hover:bg-muted/40">
+                      <TableCell className="whitespace-nowrap">
+                        {r.Supplier}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-center">
+                        {r["Account Number"]}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums">
-                        {fmtGBP(totalDifference)}
+                        {fmtGBP(r.Total)}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {fmtGBP(r.Credits)}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {fmtGBP(r.Difference)}
                       </TableCell>
                     </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+                  ))}
+                  <TableRow className="bg-muted/40 font-semibold">
+                    <TableCell className="whitespace-nowrap">TOTAL</TableCell>
+                    <TableCell className="text-center" />
+                    <TableCell className="text-center" />
+                    <TableCell className="text-center" />
+                    <TableCell className="text-center tabular-nums">
+                      {fmtGBP(totalDifference)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
 
-              {/* Chart */}
-              <Card className="border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    Difference by Supplier (chart)
-                  </CardTitle>
-                  <CardDescription>
-                    Visualising the same order as the table above.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer>
-                      <BarChart
-                        data={chartData}
-                        margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 12 }}
-                          interval={0}
-                        />
-                        <YAxis
-                          tickFormatter={(v) => gbp.format(v)}
-                          width={80}
-                        />
-                        <Tooltip
-                          formatter={(value: unknown) => {
+            {/* Chart */}
+            <Card className="border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  Difference by Supplier (chart)
+                </CardTitle>
+                <CardDescription>
+                  Visualising the same order as the table above.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72 w-full">
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 12 }}
+                        interval={0}
+                      />
+                      <YAxis tickFormatter={(v) => gbp.format(v)} width={80} />
+                      <Tooltip
+                        formatter={(value: unknown) => {
+                          const n =
+                            typeof value === "number"
+                              ? value
+                              : Number(value as unknown);
+                          return fmtGBP(Number.isFinite(n) ? n : 0);
+                        }}
+                        labelFormatter={(label: unknown) =>
+                          `Supplier: ${String(label)}`
+                        }
+                      />
+                      <Bar dataKey="diff">
+                        <LabelList
+                          dataKey="diff"
+                          position="top"
+                          formatter={(label: React.ReactNode) => {
                             const n =
-                              typeof value === "number"
-                                ? value
-                                : Number(value as unknown);
+                              typeof label === "number"
+                                ? label
+                                : Number(label as unknown);
                             return fmtGBP(Number.isFinite(n) ? n : 0);
                           }}
-                          labelFormatter={(label: unknown) =>
-                            `Supplier: ${String(label)}`
-                          }
                         />
-                        <Bar dataKey="diff">
-                          <LabelList
-                            dataKey="diff"
-                            position="top"
-                            formatter={(label: React.ReactNode) => {
-                              const n =
-                                typeof label === "number"
-                                  ? label
-                                  : Number(label as unknown);
-                              return fmtGBP(Number.isFinite(n) ? n : 0);
-                            }}
-                          />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Budget analysis */}
-              <Card className="border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Budget analysis</CardTitle>
-                  <CardDescription>
-                    PRPD = Per-Resident-Per-Day. We assume {dim} days in the
-                    current month.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="residents">Residents</Label>
-                      <Input
-                        id="residents"
-                        type="number"
-                        min={0}
-                        step="1"
-                        inputMode="numeric"
-                        className="cursor-pointer"
-                        value={residents}
-                        onChange={(e) =>
-                          setResidents(parseNumberOrEmpty(e.target.value))
-                        }
-                        placeholder="Enter number of residents"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="prpd">PRPD (£)</Label>
-                      <Input
-                        id="prpd"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        inputMode="decimal"
-                        className="cursor-pointer"
-                        value={prpd}
-                        onChange={(e) =>
-                          setPrpd(parseNumberOrEmpty(e.target.value))
-                        }
-                        placeholder="11.28"
-                      />
-                    </div>
+            {/* Budget analysis */}
+            <Card className="border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Budget analysis</CardTitle>
+                <CardDescription>
+                  PRPD = Per-Resident-Per-Day. We assume {dim} days in the
+                  current month.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="residents">Residents</Label>
+                    <Input
+                      id="residents"
+                      type="number"
+                      min={0}
+                      step="1"
+                      inputMode="numeric"
+                      className="cursor-pointer"
+                      value={residents}
+                      onChange={(e) =>
+                        setResidents(parseNumberOrEmpty(e.target.value))
+                      }
+                      placeholder="Enter number of residents"
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prpd">PRPD (£)</Label>
+                    <Input
+                      id="prpd"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      className="cursor-pointer"
+                      value={prpd}
+                      onChange={(e) =>
+                        setPrpd(parseNumberOrEmpty(e.target.value))
+                      }
+                      placeholder="11.28"
+                    />
+                  </div>
+                </div>
 
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted">
-                          <TableHead>Metric</TableHead>
-                          <TableHead className="text-right">Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>
-                            Monthly budget (Residents × PRPD × {dim} days)
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {fmtGBP(monthlyBudget)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell>
-                            Current spend (total of Difference + Pleo)
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {fmtGBP(totalDifference)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow className="bg-muted/40 font-semibold">
-                          <TableCell>Current % of monthly budget</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {monthlyBudget
-                              ? `${percentOfBudget.toFixed(2)}%`
-                              : ""}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </CardContent>
-          </Card>
-        )}
-      </motion.main>
-    </AnimatePresence>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted">
+                        <TableHead>Metric</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>
+                          Monthly budget (Residents × PRPD × {dim} days)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmtGBP(monthlyBudget)}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>
+                          Current spend (total of Difference + Pleo)
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmtGBP(totalDifference)}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow className="bg-muted/40 font-semibold">
+                        <TableCell>Current % of monthly budget</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {monthlyBudget
+                            ? `${percentOfBudget.toFixed(2)}%`
+                            : ""}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
+      )}
+    </main>
   );
 }
