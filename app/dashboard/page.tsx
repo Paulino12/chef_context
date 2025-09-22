@@ -19,20 +19,20 @@ const page = () => {
           ease: "easeInOut",
         }}
         className={[
-          "w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+          "mt-10 grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-2",
           LAYOUT.CONTENT_MAX_W, // max width scales at lg
           LAYOUT.SECTION_GAP,
         ].join(" ")}
       >
-        {TOOLS.map((Tool) => (
-          <NavLink
-            key={Tool.id}
-            href={Tool.href}
-            className="border rounded-md hover:bg-accent/50 transition-colors flex-1 h-full"
-          >
-            <ToolCard title={Tool.title} description={Tool.description} />
-          </NavLink>
-        ))}
+        {TOOLS.map((tool) => (
+            <ToolCard
+              key={tool.id}
+              title={tool.title}
+              detail={tool.detail}
+              href={tool.href}
+              description={tool.description}
+            />
+          ))}
       </motion.div>
     </AnimatePresence>
   );

@@ -477,7 +477,7 @@ export default function InvoiceAnalyzerUpload() {
             </Button>
             {csv && (
               <Button onClick={onDownloadCsv} className="cursor-pointer">
-                ⬇️ Download henbrook_invoice_analysis.csv
+                ⬇️ Download invoice analysis
               </Button>
             )}
           </CardFooter>
