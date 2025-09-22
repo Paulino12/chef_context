@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TOOLS } from "../lib/tools";
 import { NavLink } from "../components/nav-link";
 import ToolCard from "../components/tool-card";
+import { LAYOUT } from "../lib/ui";
 
 const page = () => {
   return (
@@ -17,13 +18,17 @@ const page = () => {
           delay: 0.1,
           ease: "easeInOut",
         }}
-        className="w-full mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        className={[
+          "w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+          LAYOUT.CONTENT_MAX_W, // max width scales at lg
+          LAYOUT.SECTION_GAP,
+        ].join(" ")}
       >
         {TOOLS.map((Tool) => (
           <NavLink
             key={Tool.id}
             href={Tool.href}
-            className="border rounded-md hover:bg-accent/50 transition-colors flex-1"
+            className="border rounded-md hover:bg-accent/50 transition-colors flex-1 h-full"
           >
             <ToolCard title={Tool.title} description={Tool.description} />
           </NavLink>

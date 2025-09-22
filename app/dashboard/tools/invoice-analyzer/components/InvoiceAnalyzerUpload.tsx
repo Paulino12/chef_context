@@ -3,18 +3,18 @@
 /**
  * InvoiceAnalyzerUpload.tsx
  *
- * Front-end uploader for the Invoice Analyzer tool.
- * - Upload .zip -> POST to /api/invoice-analyzer (Next proxy -> FastAPI)
- * - Show summary metrics
- * - Show totals table (custom supplier order) with a final TOTAL row (Difference sum)
- * - NEW: Chart card visualising Supplier vs Difference
- * - Budget analysis card (Residents × PRPD × days-in-month) with % of budget
+ * - Upload a Pelican ZIP -> POST /api/invoice-analyzer (Next proxy -> FastAPI)
+ * - Show summary tiles: Invoices (whitelist), Credits, Days covered (distinct dates)
+ * - Supplier totals table in a custom order + TOTAL (Difference)
+ * - Pleo card input (above the table) included in totals/budget, not shown as a row
+ * - Chart (Supplier vs Difference) with abbreviated tick labels
+ * - Budget analysis: Residents × PRPD × days-in-month, % of budget
  *
- * Uses shadcn/ui and Recharts.
+ * UI: shadcn/ui, chart: Recharts
  */
 
 import * as React from "react";
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -45,12 +45,11 @@ import {
   Tooltip,
   LabelList,
 } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
 import { LAYOUT } from "@/app/lib/ui";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ----------------------------- Types & Helpers ----------------------------- */
 
-/** Row schema returned by the backend for the totals table */
 type TotalsRow = {
   Supplier: string;
   "Account Number": string;
@@ -59,19 +58,17 @@ type TotalsRow = {
   Difference: number | null;
 };
 
-/** JSON shape from the /api/invoice-analyzer route */
 type AnalyzeResponse = {
   summary?: {
     invoices_loaded: number;
     credits_count: number;
-    skipped: [string, string][];
+    // skipped omitted on purpose (not used in UI anymore)
   };
   totals?: TotalsRow[];
-  csv?: string; // raw CSV text for henbrook_invoice_analysis.csv
+  csv?: string; // henbrook_invoice_analysis.csv (raw text)
   error?: string;
 };
 
-/** Currency formatter (GBP, 2dp) */
 const gbp = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
@@ -79,13 +76,12 @@ const gbp = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
 });
 
-/** Format a number as GBP (blank for null/undefined) */
 function fmtGBP(v: number | null | undefined) {
   if (v == null) return "";
   return gbp.format(v);
 }
 
-/** Supplier order (exact order requested) */
+/** Requested supplier order for the table */
 const CUSTOM_ORDER = [
   "Direct Seafood",
   "Ritter",
@@ -97,10 +93,6 @@ const CUSTOM_ORDER = [
   "Majestic Wine House",
 ] as const;
 
-/**
- * Sort totals rows by our custom supplier order, then by Total (desc) inside ties.
- * Keeps presentation consistent regardless of backend order.
- */
 function sortTotals(rows: TotalsRow[]): TotalsRow[] {
   const rank = new Map<string, number>(CUSTOM_ORDER.map((n, i) => [n, i]));
   return [...rows].sort((a, b) => {
@@ -113,38 +105,177 @@ function sortTotals(rows: TotalsRow[]): TotalsRow[] {
   });
 }
 
-/** Days in the current month (local time) */
+/** Abbreviate long supplier names for the chart tick labels */
+function shortName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.startsWith("vegetarian")) return "Veg Exp";
+  if (n.startsWith("majestic")) return "Majestic";
+  if (n.startsWith("direct sea")) return "Direct Sea";
+  if (n.startsWith("ncbfresh")) return "NCBFresh";
+  if (n.startsWith("ncb meat")) return "NCB Meat";
+  if (n.startsWith("bidfood (bistro)")) return "Bidfood (Bistro)";
+  return name.length > 16 ? name.slice(0, 14) + "…" : name;
+}
+
+/** Local utilities */
 function daysInCurrentMonth(): number {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 }
 
+/** Parse "Date" strings to JS Date (supports dd/mm/yyyy and ISO yyyy-mm-dd) */
+function parseDateLoose(s: string): Date | null {
+  const t = s.trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) {
+    const d = new Date(t);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const m = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    const d = new Date(yyyy, mm - 1, dd);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Count distinct invoice dates in the CSV ("Date" column), blank-safe.
+ * We parse dates loosely and use the ISO date string (yyyy-mm-dd) as Set key.
+ */
+function countDistinctDatesFromCsv(csvText: string): number {
+  const lines = csvText.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) return 0;
+
+  const headers = lines[0].split(",");
+  const dateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "date");
+  if (dateIdx === -1) return 0;
+
+  const seen = new Set<string>();
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",");
+    const raw = (cols[dateIdx] ?? "").trim();
+    if (!raw) continue;
+    const d = parseDateLoose(raw);
+    if (d) seen.add(d.toISOString().slice(0, 10));
+  }
+  return seen.size;
+}
+
 /* --------------------------------- Component -------------------------------- */
 
 export default function InvoiceAnalyzerUpload() {
-  // UI state
+  // File input
   const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileKey, setFileKey] = useState(0); // allow reselecting same file after reset
+
+  // Busy/error
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Data returned by analyzer
+  // Returned data
   const [csv, setCsv] = useState<string | null>(null);
   const [totals, setTotals] = useState<TotalsRow[]>([]);
   const [summary, setSummary] = useState<AnalyzeResponse["summary"] | null>(
     null
   );
 
-  // Budget inputs (front end only)
+  // Budget inputs
   const [residents, setResidents] = useState<number | "">("");
-  const [prpd, setPrpd] = useState<number | "">(11.28); // default PRPD
+  const [prpd, setPrpd] = useState<number | "">(11.28);
 
-  // inside component:
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Pleo (manual difference) — added to TOTAL & budget, not a table row
+  const [pleoDiff, setPleoDiff] = useState<number | "">("");
+
+  // Days covered (inclusive range), plus extra info for display
+  const [daysCovered, setDaysCovered] = useState<number | null>(null);
+  const [dateRange, setDateRange] = useState<{
+    minISO: string;
+    maxISO: string;
+  } | null>(null);
+  const [distinctDays, setDistinctDays] = useState<number | null>(null);
+  /** Parse "Date" strings to JS Date (supports dd/mm/yyyy and ISO yyyy-mm-dd) */
+  function parseDateLoose(s: string): Date | null {
+    const t = s.trim();
+    if (!t) return null;
+    // ISO first
+    if (/^\d{4}-\d{2}-\d{2}/.test(t)) {
+      const d = new Date(t);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    // dd/mm/yyyy (or dd-mm-yyyy)
+    const m = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+      const d = new Date(yyyy, mm - 1, dd);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(t);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
 
   /**
-   * Analyze: send the ZIP to our Next API route which proxies to the FastAPI backend.
-   * Clears previous state, handles errors, and stores CSV + totals + summary.
+   * Compute coverage from CSV "Date" column:
+   *  - rangeDays: inclusive day count between min and max dates
+   *  - distinctDays: number of unique dates present
+   *  - minISO / maxISO: ISO yyyy-mm-dd strings
    */
+  function computeDateCoverageFromCsv(csvText: string): {
+    rangeDays: number;
+    distinctDays: number;
+    minISO: string;
+    maxISO: string;
+  } {
+    const lines = csvText.split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2)
+      return { rangeDays: 0, distinctDays: 0, minISO: "", maxISO: "" };
+
+    const headers = lines[0].split(",");
+    const dateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "date");
+    if (dateIdx === -1)
+      return { rangeDays: 0, distinctDays: 0, minISO: "", maxISO: "" };
+
+    const dates: Date[] = [];
+    const seen = new Set<string>();
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      const raw = (cols[dateIdx] ?? "").trim();
+      if (!raw) continue;
+      const d = parseDateLoose(raw);
+      if (!d) continue;
+      const iso = d.toISOString().slice(0, 10);
+      seen.add(iso);
+      dates.push(d);
+    }
+
+    if (dates.length === 0) {
+      return { rangeDays: 0, distinctDays: 0, minISO: "", maxISO: "" };
+    }
+    // min/max
+    const min = new Date(Math.min(...dates.map((d) => d.getTime())));
+    const max = new Date(Math.max(...dates.map((d) => d.getTime())));
+    // inclusive days (e.g., 01→08 = 8 days)
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const rangeDays =
+      Math.floor((max.getTime() - min.getTime()) / msPerDay) + 1;
+
+    return {
+      rangeDays,
+      distinctDays: seen.size,
+      minISO: min.toISOString().slice(0, 10),
+      maxISO: max.toISOString().slice(0, 10),
+    };
+  }
+
+  // Analyze
   async function onAnalyze() {
     if (!file) return;
     setBusy(true);
@@ -165,23 +296,30 @@ export default function InvoiceAnalyzerUpload() {
       if (!res.ok)
         throw new Error(json?.error || `Server error (${res.status})`);
 
-      setCsv(json.csv ?? null);
-      setTotals(sortTotals(json.totals ?? []));
+      const rows = sortTotals(json.totals ?? []);
+      setTotals(rows);
       setSummary(json.summary ?? null);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : "Analysis failed";
-      alert(msg);
+      setCsv(json.csv ?? null);
+      // setDaysCovered(json.csv ? countDistinctDatesFromCsv(json.csv) : 0);
+      if (json.csv) {
+        const cov = computeDateCoverageFromCsv(json.csv);
+        setDaysCovered(cov.rangeDays); // <- use inclusive range days for the tile
+        setDistinctDays(cov.distinctDays); // optional display
+        setDateRange({ minISO: cov.minISO, maxISO: cov.maxISO });
+      } else {
+        setDaysCovered(0);
+        setDistinctDays(0);
+        setDateRange(null);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      setErr(msg);
     } finally {
       setBusy(false);
     }
   }
 
-  /** Download the CSV returned by the backend (button only shows after analysis) */
+  // Download CSV
   function onDownloadCsv() {
     if (!csv) return;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -193,32 +331,39 @@ export default function InvoiceAnalyzerUpload() {
     URL.revokeObjectURL(url);
   }
 
-  /** Reset to initial UI state */
+  // Reset
   function onReset() {
     setFile(null);
     setTotals([]);
-    setCsv(null);
     setSummary(null);
+    setCsv(null);
     setErr(null);
     setResidents("");
     setPrpd(11.28);
-
-    // clear the actual <input type="file">
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setPleoDiff("");
+    setDaysCovered(null);
+    if (fileRef.current) fileRef.current.value = "";
+    setFileKey((k) => k + 1);
   }
 
-  /** Sum of the Difference column (ignores nulls) */
-  const totalDifference = useMemo(
-    () => totals.reduce((acc, r) => acc + (r.Difference ?? 0), 0),
-    [totals]
-  );
+  // Numbers helpers
+  function parseNumberOrEmpty(s: string): number | "" {
+    if (s.trim() === "") return "";
+    const n = Number(s);
+    return Number.isFinite(n) ? n : "";
+  }
 
-  /** Days in current month (fixed for the current calendar month) */
+  const pleoValue = useMemo(() => {
+    const n = typeof pleoDiff === "number" ? pleoDiff : Number(pleoDiff || 0);
+    return Number.isFinite(n) ? n : 0;
+  }, [pleoDiff]);
+
+  const totalDifference = useMemo(() => {
+    const supplierSum = totals.reduce((acc, r) => acc + (r.Difference ?? 0), 0);
+    return supplierSum + pleoValue;
+  }, [totals, pleoValue]);
+
   const dim = useMemo(() => daysInCurrentMonth(), []);
-
-  /** Monthly budget = Residents × PRPD × DaysInMonth (front-end only, after analysis) */
   const monthlyBudget = useMemo(() => {
     const rr = typeof residents === "number" ? residents : Number(residents);
     const pp = typeof prpd === "number" ? prpd : Number(prpd);
@@ -226,24 +371,17 @@ export default function InvoiceAnalyzerUpload() {
     return rr * pp * dim;
   }, [residents, prpd, dim]);
 
-  /** Current spend % of budget = totalDifference / monthlyBudget * 100 */
   const percentOfBudget = useMemo(() => {
     if (!monthlyBudget) return 0;
     return (totalDifference / monthlyBudget) * 100;
   }, [monthlyBudget, totalDifference]);
 
-  /** Helpers to bind numeric inputs while allowing empty state */
-  function parseNumberOrEmpty(s: string): number | "" {
-    if (s.trim() === "") return "";
-    const n = Number(s);
-    return Number.isFinite(n) ? n : "";
-  }
-
-  /** Chart data: Supplier vs Difference (uses current totals order) */
+  // Chart data (suppliers only; Pleo isn’t a supplier row)
   const chartData = useMemo(
     () =>
       totals.map((r) => ({
         supplier: r.Supplier,
+        label: shortName(r.Supplier),
         diff: r.Difference ?? 0,
       })),
     [totals]
@@ -252,22 +390,13 @@ export default function InvoiceAnalyzerUpload() {
   return (
     <AnimatePresence>
       <motion.main
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{
-          duration: 1,
-          delay: 0.1,
-          ease: "easeInOut",
-        }}
-        // className="mx-auto max-w-5xl space-y-8"
         className={[
           "mx-auto max-w-5xl space-y-8",
           LAYOUT.CONTENT_MAX_W, // max width scales at lg
           LAYOUT.SECTION_GAP,
         ].join(" ")}
       >
-        {/* Uploader Card */}
+        {/* Uploader */}
         <Card className="border">
           <CardHeader>
             <CardTitle>Invoice Analyzer</CardTitle>
@@ -277,17 +406,17 @@ export default function InvoiceAnalyzerUpload() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* File chooser + Analyze button */}
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
               <div className="space-y-2">
                 <Label htmlFor="zip" className="cursor-pointer">
                   Choose file
                 </Label>
                 <Input
+                  key={fileKey}
                   id="zip"
                   type="file"
                   accept=".zip"
-                  ref={fileInputRef} // <-- add this
+                  ref={fileRef}
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   className="cursor-pointer font-bold"
                 />
@@ -303,10 +432,8 @@ export default function InvoiceAnalyzerUpload() {
               </Button>
             </div>
 
-            {/* Error message (if any) */}
             {err && <p className="text-sm text-red-600">{err}</p>}
 
-            {/* Summary tiles (only after analysis) */}
             {summary && (
               <>
                 <Separator className="my-2" />
@@ -329,9 +456,9 @@ export default function InvoiceAnalyzerUpload() {
                   </Card>
                   <Card>
                     <CardHeader className="p-3">
-                      <CardDescription>Skipped files</CardDescription>
+                      <CardDescription>Days covered</CardDescription>
                       <CardTitle className="text-2xl">
-                        {summary?.skipped?.length ?? 0}
+                        {daysCovered ?? 0}
                       </CardTitle>
                     </CardHeader>
                   </Card>
@@ -348,8 +475,6 @@ export default function InvoiceAnalyzerUpload() {
             >
               Reset
             </Button>
-
-            {/* Download is only shown AFTER we have a CSV from analysis */}
             {csv && (
               <Button onClick={onDownloadCsv} className="cursor-pointer">
                 ⬇️ Download henbrook_invoice_analysis.csv
@@ -358,22 +483,41 @@ export default function InvoiceAnalyzerUpload() {
           </CardFooter>
         </Card>
 
-        {/* Totals Table (only after analysis) */}
+        {/* Totals + Pleo + Chart + Budget */}
         {!!totals.length && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Top suppliers by amount invoiced
+                Top suppliers by amount Number
               </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
+              {/* Pleo input (kept above table) */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="pleo-diff">Pleo card — Difference (£)</Label>
+                  <Input
+                    id="pleo-diff"
+                    type="number"
+                    step="0.01"
+                    inputMode="decimal"
+                    className="cursor-pointer"
+                    value={pleoDiff}
+                    onChange={(e) =>
+                      setPleoDiff(parseNumberOrEmpty(e.target.value))
+                    }
+                    placeholder="Enter Pleo spend (e.g. 125.50)"
+                  />
+                </div>
+              </div>
+
+              {/* Table */}
               <div className="rounded-md border">
                 <Table>
-                  <TableHeader className="bg-muted">
-                    <TableRow>
+                  <TableHeader>
+                    <TableRow className="bg-muted">
                       <TableHead>Supplier</TableHead>
-                      {/* Center these headers per request */}
                       <TableHead className="text-center">
                         Account Number
                       </TableHead>
@@ -382,14 +526,12 @@ export default function InvoiceAnalyzerUpload() {
                       <TableHead className="text-center">Difference</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {totals.map((r, idx) => (
                       <TableRow key={idx} className="hover:bg-muted/40">
                         <TableCell className="whitespace-nowrap">
                           {r.Supplier}
                         </TableCell>
-                        {/* Center these cells per request */}
                         <TableCell className="whitespace-nowrap text-center">
                           {r["Account Number"]}
                         </TableCell>
@@ -404,8 +546,6 @@ export default function InvoiceAnalyzerUpload() {
                         </TableCell>
                       </TableRow>
                     ))}
-
-                    {/* Final total row for Difference */}
                     <TableRow className="bg-muted/40 font-semibold">
                       <TableCell className="whitespace-nowrap">TOTAL</TableCell>
                       <TableCell className="text-center" />
@@ -419,7 +559,7 @@ export default function InvoiceAnalyzerUpload() {
                 </Table>
               </div>
 
-              {/* --- NEW: Chart Card (Supplier vs Difference) --- */}
+              {/* Chart */}
               <Card className="border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
@@ -437,7 +577,11 @@ export default function InvoiceAnalyzerUpload() {
                         margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="supplier" tick={{ fontSize: 12 }} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 12 }}
+                          interval={0}
+                        />
                         <YAxis
                           tickFormatter={(v) => gbp.format(v)}
                           width={80}
@@ -462,7 +606,7 @@ export default function InvoiceAnalyzerUpload() {
                               const n =
                                 typeof label === "number"
                                   ? label
-                                  : Number(label);
+                                  : Number(label as unknown);
                               return fmtGBP(Number.isFinite(n) ? n : 0);
                             }}
                           />
@@ -473,7 +617,7 @@ export default function InvoiceAnalyzerUpload() {
                 </CardContent>
               </Card>
 
-              {/* Budget analysis (front end only) */}
+              {/* Budget analysis */}
               <Card className="border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Budget analysis</CardTitle>
@@ -482,9 +626,7 @@ export default function InvoiceAnalyzerUpload() {
                     current month.
                   </CardDescription>
                 </CardHeader>
-
                 <CardContent className="space-y-4">
-                  {/* Inputs: Residents & PRPD */}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="residents">Residents</Label>
@@ -502,7 +644,6 @@ export default function InvoiceAnalyzerUpload() {
                         placeholder="Enter number of residents"
                       />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="prpd">PRPD (£)</Label>
                       <Input
@@ -521,11 +662,10 @@ export default function InvoiceAnalyzerUpload() {
                     </div>
                   </div>
 
-                  {/* Results table */}
                   <div className="rounded-md border">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-muted">
                           <TableHead>Metric</TableHead>
                           <TableHead className="text-right">Value</TableHead>
                         </TableRow>
@@ -541,7 +681,7 @@ export default function InvoiceAnalyzerUpload() {
                         </TableRow>
                         <TableRow>
                           <TableCell>
-                            Current spend (total of Difference)
+                            Current spend (total of Difference + Pleo)
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {fmtGBP(totalDifference)}
