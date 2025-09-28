@@ -118,10 +118,10 @@ function shortName(name: string): string {
 }
 
 /** Local utilities */
-function daysInCurrentMonth(): number {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-}
+// function daysInCurrentMonth(): number {
+//   const now = new Date();
+//   return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+// }
 
 /** Parse "Date" strings to JS Date (supports dd/mm/yyyy and ISO yyyy-mm-dd) */
 function parseDateLoose(s: string): Date | null {
@@ -186,8 +186,9 @@ export default function InvoiceAnalyzerUpload() {
   );
 
   // Budget inputs
-  const [residents, setResidents] = useState<number | "">("");
   const [prpd, setPrpd] = useState<number | "">(11.28);
+  const [residents, setResidents] = useState<number | "">("");
+  const [numberOfDays, setnumberOfDays] = useState<number | "">("");
 
   // Pleo (manual difference) — added to TOTAL & budget, not a table row
   const [pleoDiff, setPleoDiff] = useState<number | "">("");
@@ -338,8 +339,9 @@ export default function InvoiceAnalyzerUpload() {
     setSummary(null);
     setCsv(null);
     setErr(null);
-    setResidents("");
     setPrpd(11.28);
+    setResidents("");
+    setnumberOfDays("");
     setPleoDiff("");
     setDaysCovered(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -363,13 +365,15 @@ export default function InvoiceAnalyzerUpload() {
     return supplierSum + pleoValue;
   }, [totals, pleoValue]);
 
-  const dim = useMemo(() => daysInCurrentMonth(), []);
+  // const dim = useMemo(() => daysInCurrentMonth(), []);
   const monthlyBudget = useMemo(() => {
-    const rr = typeof residents === "number" ? residents : Number(residents);
     const pp = typeof prpd === "number" ? prpd : Number(prpd);
-    if (!rr || !pp) return 0;
-    return rr * pp * dim;
-  }, [residents, prpd, dim]);
+    const rr = typeof residents === "number" ? residents : Number(residents);
+    const nn =
+      typeof numberOfDays === "number" ? numberOfDays : Number(numberOfDays);
+    if (!rr || !pp || !nn) return 0;
+    return rr * pp * nn;
+  }, [residents, prpd, numberOfDays]);
 
   const percentOfBudget = useMemo(() => {
     if (!monthlyBudget) return 0;
@@ -492,25 +496,6 @@ export default function InvoiceAnalyzerUpload() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* Pleo input (kept above table) */}
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="pleo-diff">Pleo card — Difference (£)</Label>
-                <Input
-                  id="pleo-diff"
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  className="cursor-pointer"
-                  value={pleoDiff}
-                  onChange={(e) =>
-                    setPleoDiff(parseNumberOrEmpty(e.target.value))
-                  }
-                  placeholder="Enter Pleo spend (e.g. 125.50)"
-                />
-              </div>
-            </div>
-
             {/* Table */}
             <div className="rounded-md border">
               <Table>
@@ -617,27 +602,24 @@ export default function InvoiceAnalyzerUpload() {
             <Card className="border">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Budget analysis</CardTitle>
-                <CardDescription>
-                  PRPD = Per-Resident-Per-Day. We assume {dim} days in the
-                  current month.
-                </CardDescription>
+                <CardDescription>PRPD = Per-Resident-Per-Day.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-4">
+                  {/* Pleo input (kept above table) */}
                   <div className="space-y-2">
-                    <Label htmlFor="residents">Residents</Label>
+                    <Label htmlFor="pleo-diff">Pleo card (£)</Label>
                     <Input
-                      id="residents"
+                      id="pleo-diff"
                       type="number"
-                      min={0}
-                      step="1"
-                      inputMode="numeric"
+                      step="0.01"
+                      inputMode="decimal"
                       className="cursor-pointer"
-                      value={residents}
+                      value={pleoDiff}
                       onChange={(e) =>
-                        setResidents(parseNumberOrEmpty(e.target.value))
+                        setPleoDiff(parseNumberOrEmpty(e.target.value))
                       }
-                      placeholder="Enter number of residents"
+                      placeholder="Enter Pleo spend"
                     />
                   </div>
                   <div className="space-y-2">
@@ -656,6 +638,39 @@ export default function InvoiceAnalyzerUpload() {
                       placeholder="11.28"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="residents">Residents</Label>
+                    <Input
+                      id="residents"
+                      type="number"
+                      min={0}
+                      step="1"
+                      inputMode="numeric"
+                      className="cursor-pointer"
+                      value={residents}
+                      onChange={(e) =>
+                        setResidents(parseNumberOrEmpty(e.target.value))
+                      }
+                      placeholder="Enter number of residents"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="residents">Number of days</Label>
+                    <Input
+                      id="numberOfDays"
+                      type="number"
+                      min={0}
+                      step="1"
+                      inputMode="numeric"
+                      className="cursor-pointer"
+                      value={numberOfDays}
+                      onChange={(e) =>
+                        setnumberOfDays(parseNumberOrEmpty(e.target.value))
+                      }
+                      placeholder="Enter number of days"
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded-md border">
@@ -669,7 +684,7 @@ export default function InvoiceAnalyzerUpload() {
                     <TableBody>
                       <TableRow>
                         <TableCell>
-                          Monthly budget (Residents × PRPD × {dim} days)
+                          Monthly budget (Residents × PRPD × Number of days)
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {fmtGBP(monthlyBudget)}
