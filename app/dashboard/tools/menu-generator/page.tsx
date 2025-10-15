@@ -1,5 +1,35 @@
 "use client";
 
+/**
+ * MenuGeneratorPage (Daily Menu Generator)
+ *
+ * PURPOSE
+ * - Upload a weekly DOCX grid and generate menus (either for one day or all 7 days).
+ * - If the filename contains a date (e.g. "... WC 22-09-2025.docx"), we auto-detect the week
+ *   and provide a dropdown containing Mon..Sun of that week.
+ *
+ * FRONTEND–BACKEND CONTRACT
+ * - POST /api/generate (Next.js proxy → FastAPI /generate)
+ *   Request (multipart/form-data):
+ *     - weekly: File (required, .docx)
+ *     - date: YYYY-MM-DD (required if mode === "one")
+ *     - all_days: "true" (required if mode === "seven")
+ *   Response:
+ *     - Body: ZIP
+ *     - Headers: Content-Disposition (filename), Cache-Control: no-store
+ *
+ * UX NOTES
+ * - Mode selector: "One day" or "All 7 days".
+ * - If we can parse a week from the filename → show a 7-day dropdown.
+ * - Otherwise we show a calendar popover for a single date.
+ * - Button shows "Generating…" while the download is prepared.
+ *
+ * TECH NOTES
+ * - We use a short timeout before URL.revokeObjectURL so the browser can begin the download.
+ * - We set cache: "no-store" to avoid odd caching behavior in production.
+ * - Monday is selected by default for the one-day flow when a parsed week is available.
+ */
+
 import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,7 +50,7 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDownIcon } from "lucide-react";
 import { LAYOUT } from "@/app/lib/ui";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, number } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -29,16 +59,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAdaptiveProgress } from "@/hooks/useAdaptieProgress";
 
-/* ---------------- Utilities (unchanged from your version) ----------------- */
+/* -------------------------- Utilities (pure helpers) -------------------------- */
+
+/** Convert a Date to YYYY-MM-DD in local time (avoids TZ drift) */
 const toYMDLocal = (d: Date) =>
   new Date(d.getTime() - d.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 10);
+/** Parse YYYY-MM-DD → Date */
 const fromYMD = (s: string) => {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y!, m! - 1, d!);
 };
+
+/** Extract a plausible date from a filename, supports dd-mm-yyyy or yyyy-mm-dd */
 function filenameDate(fileName: string): Date | undefined {
   const m1 = fileName.match(/(\d{2})[-_/](\d{2})[-_/](\d{4})/);
   if (m1) return new Date(+m1[3]!, +m1[2]! - 1, +m1[1]!);
@@ -46,6 +82,8 @@ function filenameDate(fileName: string): Date | undefined {
   if (m2) return new Date(+m2[1]!, +m2[2]! - 1, +m2[3]!);
   return undefined;
 }
+
+/** Get the Monday for a given date */
 const mondayOf = (d: Date) => {
   const x = new Date(d);
   const delta = (x.getDay() + 6) % 7; // since Monday
@@ -53,13 +91,19 @@ const mondayOf = (d: Date) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
+
+/** Build an array of 7 dates from Monday to Sunday */
 const weekDays = (mon: Date) =>
   Array.from(
     { length: 7 },
     (_, i) => new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i)
   );
+
+/** e.g., "Wednesday – 2025-09-10" */
 const prettyOption = (d: Date) =>
   `${d.toLocaleDateString(undefined, { weekday: "long" })} – ${toYMDLocal(d)}`;
+
+/** Try to read a filename from Content-Disposition for nice downloads */
 const filenameFromContentDisposition = (cd: string | null) => {
   if (!cd) return null;
   const m1 = cd.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
@@ -71,6 +115,7 @@ const filenameFromContentDisposition = (cd: string | null) => {
 /* ------------------------------- Component -------------------------------- */
 
 export default function MenuGeneratorPage() {
+  /* ------------------------------- Local state ------------------------------- */
   // Uploaded weekly DOCX
   const [weekly, setWeekly] = useState<File | null>(null);
 
@@ -86,7 +131,19 @@ export default function MenuGeneratorPage() {
   // Downloading flag
   const [downloading, setDownloading] = useState(false);
 
-  // When a file is picked, try to infer the week → build Mon..Sun array
+  const { remainingMs, percent, busy, runWithETA } = useAdaptiveProgress(
+    "eta-generate-zip", // unique key per tool/action
+    120_000 // sensible default ETA for prod (2 min)
+  );
+
+  /* ----------------------------- Derived week info ---------------------------- */
+
+  /**
+   * When a file is selected:
+   *  - Try to parse a hint date from the filename
+   *  - Build Mon..Sun for the week
+   * If parsing fails, parsedWeek is undefined and we fall back to a calendar.
+   */
   const parsedWeek = useMemo(() => {
     if (!weekly) return undefined;
     const hint = filenameDate(weekly.name);
@@ -94,74 +151,59 @@ export default function MenuGeneratorPage() {
     return weekDays(mondayOf(hint));
   }, [weekly]);
 
+  /**
+   * UX: If we’re in one-day mode, and we just parsed a week, pick Monday by default.
+   * This makes the Select show a concrete value immediately.
+   */
+
   useEffect(() => {
     if (mode === "one" && parsedWeek && !date) {
       setDate(parsedWeek[0]); //Monday
     }
   }, [mode, parsedWeek, date]);
 
-  const submit = async () => {
-    if (!weekly) return alert("Upload the weekly DOCX first.");
+  /* --------------------------------- Actions --------------------------------- */
 
-    const fd = new FormData();
-    fd.append("weekly", weekly);
+  /** Submit to backend, stream a ZIP, and trigger a browser download */
+  const submit = () => {
+    runWithETA(async () => {
+      if (!weekly) return alert("Upload the weekly DOCX first.");
 
-    if (mode === "seven") {
-      fd.append("all_days", "true");
-    } else {
-      const chosen = date ?? parsedWeek?.[0];
-      if (!chosen) return alert("Pick a date from the list.");
-      fd.append("date", toYMDLocal(chosen));
-    }
+      const fd = new FormData();
+      fd.append("weekly", weekly);
 
-    // Optional: cancel in-flight if component unmounts
-    const ctrl = new AbortController();
-    setDownloading(true);
-    try {
+      if (mode === "seven") {
+        fd.append("all_days", "true");
+      } else {
+        const chosen = date ?? parsedWeek?.[0];
+        if (!chosen) return alert("Pick a date from the list.");
+        fd.append("date", toYMDLocal(chosen));
+      }
       const res = await fetch("/api/generate", {
         method: "POST",
         body: fd,
-        cache: "no-store", // <-- avoid caching issues
-        signal: ctrl.signal,
+        cache: "no-store",
       });
-
-      if (!res.ok) {
-        throw new Error((await res.text()) || "Generation failed");
-      }
-
-      // Get filename from Content-Disposition if available
+      if (!res.ok) throw new Error((await res.text()) || "Generation failed");
       const cd = res.headers.get("content-disposition");
       const name =
         filenameFromContentDisposition(cd) ??
         (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
-
-      // Buffer the file and trigger a download
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = url;
       a.download = name;
-
-      // Append to DOM so click is honored by all browsers
       document.body.appendChild(a);
       a.click();
       a.remove();
-
-      // Revoke after a short delay so the browser has consumed the URL
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : "Generation failed";
-      alert(msg);
-    } finally {
-      setDownloading(false); // <-- reliably flips the button back
-    }
+    }).finally(() => {
+      setDownloading(false); // safety reset
+    });
   };
+
+  /* ---------------------------------- Render --------------------------------- */
 
   return (
     <AnimatePresence>
@@ -298,13 +340,30 @@ export default function MenuGeneratorPage() {
               ))}
 
             {/* Generate button: full width on mobile, natural width from sm+ */}
-            <Button
-              className="w-full cursor-pointer"
-              onClick={submit}
-              disabled={downloading}
-            >
-              {downloading ? "Generating…" : "Generate"}
-            </Button>
+            {!busy ? (
+              <Button className="w-full cursor-pointer" onClick={submit}>
+                Generate
+              </Button>
+            ) : (
+              // Button becomes a progress bar with "Generating…" visible behind the fill
+              <div
+                className="relative w-full h-10 rounded-md border overflow-hidden select-none"
+                aria-label="Generating"
+              >
+                {/* Progress fill (kept translucent so the text remains visible “in the background”) */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-primary/30 transition-[width] duration-100"
+                  style={{ width: `${percent}%` }}
+                />
+                {/* Centered text over the background */}
+                <div className="absolute inset-0 grid place-items-center text-sm font-semibold">
+                  Generating Menu
+                  {` (${
+                    remainingMs !== null && (remainingMs / 1000).toFixed(1)
+                  }s left)`}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.main>

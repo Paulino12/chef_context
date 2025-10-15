@@ -4,7 +4,7 @@
  * InvoiceAnalyzerUpload.tsx
  *
  * - Upload a Pelican ZIP -> POST /api/invoice-analyzer (Next proxy -> FastAPI)
- * - Show summary tiles: Invoices (whitelist), Credits, Days covered (distinct dates)
+ * - Show summary tiles: Invoices, Credits, Days covered (distinct dates)
  * - Supplier totals table in a custom order + TOTAL (Difference)
  * - Pleo card input (above the table) included in totals/budget, not shown as a row
  * - Chart (Supplier vs Difference) with abbreviated tick labels
@@ -367,9 +367,9 @@ export default function InvoiceAnalyzerUpload() {
 
   // const dim = useMemo(() => daysInCurrentMonth(), []);
   const monthlyBudget = useMemo(() => {
-    const pp = typeof prpd === "number" ? prpd : Number(prpd);
-    const rr = typeof residents === "number" ? residents : Number(residents);
-    const nn =
+    const pp = typeof prpd === "number" ? prpd : Number(prpd); // per resident per day
+    const rr = typeof residents === "number" ? residents : Number(residents); // number of residents
+    const nn = // number of days
       typeof numberOfDays === "number" ? numberOfDays : Number(numberOfDays);
     if (!rr || !pp || !nn) return 0;
     return rr * pp * nn;
