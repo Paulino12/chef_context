@@ -60,6 +60,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAdaptiveProgress } from "@/hooks/useAdaptieProgress";
+import ProgressInfo from "@/app/components/ProgressInfo";
 
 /* -------------------------- Utilities (pure helpers) -------------------------- */
 
@@ -345,23 +346,12 @@ export default function MenuGeneratorPage() {
                 Generate
               </Button>
             ) : (
-              // Button becomes a progress bar with "Generating…" visible behind the fill
-              <div
-                className="relative w-full h-10 rounded-md border overflow-hidden select-none"
-                aria-label="Generating"
-              >
-                {/* Progress fill (kept translucent so the text remains visible “in the background”) */}
-                <div
-                  className="absolute inset-y-0 left-0 bg-primary/30 transition-[width] duration-100"
-                  style={{ width: `${percent}%` }}
+              <div className="w-full">
+                <ProgressInfo
+                  label="Generating menu…"
+                  percent={percent}
+                  remainingMs={remainingMs}
                 />
-                {/* Centered text over the background */}
-                <div className="absolute inset-0 grid place-items-center text-sm font-semibold">
-                  Generating Menu
-                  {` (${
-                    remainingMs !== null && (remainingMs / 1000).toFixed(1)
-                  }s left)`}
-                </div>
               </div>
             )}
           </CardContent>
