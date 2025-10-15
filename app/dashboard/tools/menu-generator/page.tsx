@@ -348,7 +348,7 @@ export default function MenuGeneratorPage() {
             ) : (
               <div className="w-full">
                 <ProgressInfo
-                  label="Generating menu…"
+                  label="Generating..."
                   percent={percent}
                   remainingMs={remainingMs}
                 />
