@@ -1,8 +1,8 @@
-"use client";
-
 import { ReactNode } from "react";
 import { NavLink } from "./nav-link";
 import { LAYOUT } from "../lib/ui";
+import SignOutButton from "./SignOutButton";
+import UserDetails from "../signin/user/page";
 
 /**
  * Header is breakpoint-aware but simple:
@@ -19,7 +19,7 @@ export function AppHeader({ start }: { start?: ReactNode }) {
         "flex items-center justify-between gap-2",
       ].join(" ")}
     >
-      <div className="flex items-center gap-2">
+      <div className="w-full flex items-center justify-between gap-2">
         {start /* e.g., <MobileNav /> shows only on mobile */}
         <NavLink
           href="/"
@@ -27,6 +27,8 @@ export function AppHeader({ start }: { start?: ReactNode }) {
         >
           Chef Context
         </NavLink>
+        <UserDetails />
+        <SignOutButton />
       </div>
     </header>
   );

@@ -190,7 +190,7 @@ export default function InvoiceAnalyzerUpload() {
   const [residents, setResidents] = useState<number | "">("");
   const [numberOfDays, setnumberOfDays] = useState<number | "">("");
 
-  // Pleo (manual difference) — added to TOTAL & budget, not a table row
+  // Pleo (manual difference) — added to budget, not a table row
   const [pleoDiff, setPleoDiff] = useState<number | "">("");
 
   // Days covered (inclusive range), plus extra info for display
@@ -360,7 +360,26 @@ export default function InvoiceAnalyzerUpload() {
     return Number.isFinite(n) ? n : 0;
   }, [pleoDiff]);
 
+  // Total suppliers invoices plus credits
+  const totalInclCredits = useMemo(() => {
+    const totalSum = totals.reduce((acc, r) => acc + (r.Total ?? 0), 0);
+    return totalSum;
+  }, [totals]);
+
+  // Total credits returned by suppliers
+  const totalCredits = useMemo(() => {
+    const creditsSum = totals.reduce((acc, r) => acc + (r.Credits ?? 0), 0);
+    return creditsSum;
+  }, [totals]);
+
+  // Total invoices less all credits returned plus pleo value
   const totalDifference = useMemo(() => {
+    const supplierSum = totals.reduce((acc, r) => acc + (r.Difference ?? 0), 0);
+    return supplierSum;
+  }, [totals]);
+
+  // Total invoices less all credits returned plus pleo value
+  const totalDifferencePlusPleo = useMemo(() => {
     const supplierSum = totals.reduce((acc, r) => acc + (r.Difference ?? 0), 0);
     return supplierSum + pleoValue;
   }, [totals, pleoValue]);
@@ -533,8 +552,12 @@ export default function InvoiceAnalyzerUpload() {
                   <TableRow className="bg-muted/40 font-semibold">
                     <TableCell className="whitespace-nowrap">TOTAL</TableCell>
                     <TableCell className="text-center" />
-                    <TableCell className="text-center" />
-                    <TableCell className="text-center" />
+                    <TableCell className="text-center tabular-nums">
+                      {fmtGBP(totalInclCredits)}
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">
+                      {fmtGBP(totalCredits)}
+                    </TableCell>
                     <TableCell className="text-center tabular-nums">
                       {fmtGBP(totalDifference)}
                     </TableCell>
@@ -695,7 +718,7 @@ export default function InvoiceAnalyzerUpload() {
                           Current spend (total of Difference + Pleo)
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {fmtGBP(totalDifference)}
+                          {fmtGBP(totalDifferencePlusPleo)}
                         </TableCell>
                       </TableRow>
                       <TableRow className="bg-muted/40 font-semibold">

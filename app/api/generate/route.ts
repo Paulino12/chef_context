@@ -1,6 +1,11 @@
 export const runtime = "nodejs";
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
+
 export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session) return new Response("Unauthorized", { status: 401 });
   const api = process.env.FASTAPI_URL!;
   const target = api.replace(/\/+$/, "") + "/generate";
 
@@ -19,8 +24,9 @@ export async function POST(req: Request) {
   // Pass through headers and force no-store
   const headers = new Headers();
   upstream.headers.forEach((v, k) => headers.set(k, v));
-  if (!headers.get("content-type")) headers.set("content-type", "application/zip");
-  headers.set("cache-control", "no-store");  // <-- important in prod
+  if (!headers.get("content-type"))
+    headers.set("content-type", "application/zip");
+  headers.set("cache-control", "no-store"); // <-- important in prod
 
   return new Response(upstream.body, { status: upstream.status, headers });
 }

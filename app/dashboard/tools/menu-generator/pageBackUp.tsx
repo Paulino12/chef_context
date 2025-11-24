@@ -59,6 +59,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAdaptiveProgress } from "@/hooks/useAdaptieProgress";
+import ProgressInfo from "@/app/components/ProgressInfo";
 
 /* -------------------------- Utilities (pure helpers) -------------------------- */
 
@@ -130,6 +132,11 @@ export default function MenuGeneratorPage() {
   // Downloading flag
   const [downloading, setDownloading] = useState(false);
 
+  const { remainingMs, percent, busy, runWithETA } = useAdaptiveProgress(
+    "eta-generate-zip", // unique key per tool/action
+    120_000 // sensible default ETA for prod (2 min)
+  );
+
   /* ----------------------------- Derived week info ---------------------------- */
 
   /**
@@ -159,82 +166,43 @@ export default function MenuGeneratorPage() {
   /* --------------------------------- Actions --------------------------------- */
 
   /** Submit to backend, stream a ZIP, and trigger a browser download */
-  const submit = async () => {
-    if (!weekly) return alert("Upload the weekly DOCX first.");
-    // Build payload
-    const fd = new FormData();
-    fd.append("weekly", weekly);
+  const submit = () => {
+    runWithETA(async () => {
+      if (!weekly) return alert("Upload the weekly DOCX first.");
 
-    if (mode === "seven") {
-      fd.append("all_days", "true");
-    } else {
-      const chosen = date ?? parsedWeek?.[0];
-      if (!chosen) return alert("Pick a date from the list.");
-      fd.append("date", toYMDLocal(chosen));
-    }
+      const fd = new FormData();
+      fd.append("weekly", weekly);
 
-    // Optional: attach an AbortController if you want to cancel on unmount
-    const ctrl = new AbortController();
-    setDownloading(true);
-    try {
-      // POST to our Next.js API route → proxy to FastAPI
+      if (mode === "seven") {
+        fd.append("all_days", "true");
+      } else {
+        const chosen = date ?? parsedWeek?.[0];
+        if (!chosen) return alert("Pick a date from the list.");
+        fd.append("date", toYMDLocal(chosen));
+      }
       const res = await fetch("/api/generate", {
         method: "POST",
         body: fd,
-        cache: "no-store", // defensive: prevents cached responses in prod
-        signal: ctrl.signal,
+        cache: "no-store",
       });
-
-      if (!res.ok) {
-        throw new Error((await res.text()) || "Generation failed");
-      }
-
-      // Try to use filename from headers; fallback to a simple default
+      if (!res.ok) throw new Error((await res.text()) || "Generation failed");
       const cd = res.headers.get("content-disposition");
       const name =
         filenameFromContentDisposition(cd) ??
         (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
-
-      // Read blob and programmatically download it
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = url;
       a.download = name;
-
-      // Append to DOM so click is honored by all browsers
       document.body.appendChild(a);
       a.click();
       a.remove();
-
-      // Let the browser consume the blob URL, then revoke
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : "Generation failed";
-      alert(msg);
-    } finally {
-      setDownloading(false); // always flip the button back
-    }
+    }).finally(() => {
+      setDownloading(false); // safety reset
+    });
   };
-
-  const [onGoingTimer, setOnGoingTimer] = useState<number>(0);
-
-  useEffect(() => {
-    // stop at 3
-    if (!downloading) return;
-
-    const timerId: ReturnType<typeof setTimeout> = setTimeout(() => {
-      setOnGoingTimer((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearTimeout(timerId);
-  }, [downloading, onGoingTimer]);
 
   /* ---------------------------------- Render --------------------------------- */
 
@@ -373,13 +341,19 @@ export default function MenuGeneratorPage() {
               ))}
 
             {/* Generate button: full width on mobile, natural width from sm+ */}
-            <Button
-              className={`w-full cursor-pointer`}
-              onClick={submit}
-              disabled={downloading}
-            >
-              {downloading ? "Generating…" : "Generate"}
-            </Button>
+            {!busy ? (
+              <Button className="w-full cursor-pointer" onClick={submit}>
+                Generate
+              </Button>
+            ) : (
+              <div className="w-full">
+                <ProgressInfo
+                  label="Generating..."
+                  percent={percent}
+                  remainingMs={remainingMs}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.main>

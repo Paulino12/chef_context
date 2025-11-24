@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TOOLS } from "./lib/tools";
 import ToolCard from "./components/tool-card";
-import { fadeUp, stagger } from "./lib/motion";
+import { fadeUp } from "./lib/motion";
 
 export default function Home() {
   const prefersReducedMotion = useReducedMotion();
