@@ -1,5 +1,6 @@
 "use client";
 
+import { TOOLS } from "../lib/tools";
 import { NavLink } from "./nav-link";
 
 /**
@@ -10,26 +11,28 @@ export function AppSidebar() {
   return (
     <nav className="p-4 text-sm space-y-3">
       <div>
-        <div className="mb-1 text-xs uppercase text-muted-foreground">Tools</div>
+        <div className="mb-1 text-xs uppercase text-muted-foreground">
+          Tools
+        </div>
         <div className="space-y-1">
-          <NavLink href="/dashboard">
-            Dashboard
-          </NavLink>
-          <NavLink href="/dashboard/tools/menu-generator" startsWith>
-            Menu Generator
-          </NavLink>
-          <NavLink href="/dashboard/tools/invoice-analyzer" startsWith>
-            Invoice Analyzer
-          </NavLink>
+          <NavLink href="/dashboard">Dashboard</NavLink>
+          {TOOLS.map((tool) => (
+            <NavLink key={tool.id} href={tool.href}>
+              {tool.title}
+            </NavLink>
+          ))}
         </div>
       </div>
 
       <div>
-        <div className="mt-4 mb-1 text-xs uppercase text-muted-foreground">Resources</div>
+        <div className="mt-4 mb-1 text-xs uppercase text-muted-foreground">
+          Resources
+        </div>
         <a
           className="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-muted"
           href="https://github.com/Paulino12/generate-menus#readme"
-          target="_blank" rel="noreferrer"
+          target="_blank"
+          rel="noreferrer"
         >
           Docs
         </a>

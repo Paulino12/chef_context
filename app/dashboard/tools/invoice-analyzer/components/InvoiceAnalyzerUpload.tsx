@@ -46,7 +46,6 @@ import {
   LabelList,
 } from "recharts";
 import { LAYOUT } from "@/app/lib/ui";
-import { motion, AnimatePresence } from "framer-motion";
 
 /* ----------------------------- Types & Helpers ----------------------------- */
 
@@ -396,8 +395,8 @@ export default function InvoiceAnalyzerUpload() {
 
   const percentOfBudget = useMemo(() => {
     if (!monthlyBudget) return 0;
-    return (totalDifference / monthlyBudget) * 100;
-  }, [monthlyBudget, totalDifference]);
+    return (totalDifferencePlusPleo / monthlyBudget) * 100;
+  }, [monthlyBudget, totalDifferencePlusPleo]);
 
   // Chart data (suppliers only; Pleo isn’t a supplier row)
   const chartData = useMemo(

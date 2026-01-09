@@ -120,3 +120,43 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+
+  #hideTitleDescription,
+  #hideOrdersDescription,
+  #hideUploadorders,
+  #hideInvoicesDescription,
+  #hideUploadInvoices,
+  #hidePrintButton,
+  #hideResetOrders,
+  #hideResetInvoices {
+    display: none;
+  }
+
+  /* Show only the printable section */
+  #budget-analyzer-print,
+  #budget-analyzer-print * {
+    visibility: visible;
+  }
+
+  /* Position it top-left so it fills the page cleanly */
+  #budget-analyzer-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Optional: remove shadows/borders that waste ink */
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+}

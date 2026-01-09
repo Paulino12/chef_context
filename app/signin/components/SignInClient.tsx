@@ -11,7 +11,6 @@ import { fadeUp } from "../../lib/motion";
 
 export default function SignInClient() {
   const sp = useSearchParams();
-  const callbackUrl = sp.get("callbackUrl") || "/dashboard";
   const error = sp.get("error");
   const reduced = useReducedMotion();
 
