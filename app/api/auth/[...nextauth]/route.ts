@@ -18,11 +18,11 @@ export const authOptions: NextAuthOptions = {
     maxAge: 60 * 60, // 1 hour
   },
   callbacks: {
-    async jwt({ token, account, profile }) {
+    async jwt({ token }) {
       // enrich token if needed
       return token;
     },
-    async session({ session, token }) {
+    async session({ session }) {
       // expose fields to the client if needed
       return session;
     },

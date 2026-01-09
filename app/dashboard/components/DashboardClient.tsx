@@ -19,7 +19,7 @@ type Props = {
   tools: Tool[];
 };
 
-export default function DashboardClient({ name, tools }: Props) {
+export default function DashboardClient({ tools }: Props) {
   const prefersReducedMotion = useReducedMotion();
   return (
     <motion.div

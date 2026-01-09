@@ -146,24 +146,24 @@ function parseDateLoose(s: string): Date | null {
  * Count distinct invoice dates in the CSV ("Date" column), blank-safe.
  * We parse dates loosely and use the ISO date string (yyyy-mm-dd) as Set key.
  */
-function countDistinctDatesFromCsv(csvText: string): number {
-  const lines = csvText.split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return 0;
+// function countDistinctDatesFromCsv(csvText: string): number {
+//   const lines = csvText.split(/\r?\n/).filter(Boolean);
+//   if (lines.length < 2) return 0;
 
-  const headers = lines[0].split(",");
-  const dateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "date");
-  if (dateIdx === -1) return 0;
+//   const headers = lines[0].split(",");
+//   const dateIdx = headers.findIndex((h) => h.trim().toLowerCase() === "date");
+//   if (dateIdx === -1) return 0;
 
-  const seen = new Set<string>();
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",");
-    const raw = (cols[dateIdx] ?? "").trim();
-    if (!raw) continue;
-    const d = parseDateLoose(raw);
-    if (d) seen.add(d.toISOString().slice(0, 10));
-  }
-  return seen.size;
-}
+//   const seen = new Set<string>();
+//   for (let i = 1; i < lines.length; i++) {
+//     const cols = lines[i].split(",");
+//     const raw = (cols[dateIdx] ?? "").trim();
+//     if (!raw) continue;
+//     const d = parseDateLoose(raw);
+//     if (d) seen.add(d.toISOString().slice(0, 10));
+//   }
+//   return seen.size;
+// }
 
 /* --------------------------------- Component -------------------------------- */
 

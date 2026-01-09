@@ -1,10 +1,8 @@
 "use client";
-import { formatRemainingVerbose } from "@/lib/time";
 
 export default function ProgressInfo({
   label = "Downloading…",
   percent,
-  remainingMs,
 }: {
   label?: string;
   percent: number; // 0..100
