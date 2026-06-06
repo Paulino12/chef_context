@@ -67,9 +67,9 @@ export function SiteHeader({ session }: SiteHeaderProps) {
         ))}
         {recipeTool ? (
           <Link
-            href={recipeTool.href}
-            target="_blank"
-            rel="noreferrer"
+            href={session ? recipeTool.href : "/signin?callbackUrl=/dashboard"}
+            target={session ? "_blank" : undefined}
+            rel={session ? "noreferrer" : undefined}
             className={cn(navClass(false), itemClassName)}
             onClick={() => setMobileMenuOpen(false)}
           >
