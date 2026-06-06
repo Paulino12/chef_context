@@ -1,8 +1,6 @@
-import { getServerSession } from "next-auth";
-
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import HomeClient from "@/app/components/home-client";
 import { Tool, TOOLS } from "@/app/lib/tools";
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 
 function getToolsForSession(isSignedIn: boolean): Tool[] {
   if (isSignedIn) return TOOLS;
@@ -21,7 +19,7 @@ function getToolsForSession(isSignedIn: boolean): Tool[] {
 }
 
 export default async function Home() {
-  const session = await getServerSession(authOptions);
+  const session = await getServerAccessSession();
   const isSignedIn = Boolean(session);
 
   return <HomeClient tools={getToolsForSession(isSignedIn)} isSignedIn={isSignedIn} />;

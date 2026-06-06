@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
@@ -40,6 +39,11 @@ export function SiteHeader({ session }: SiteHeaderProps) {
   }, [pathname]);
 
   const displayName = session?.name || session?.email || "";
+
+  async function handleSignOut() {
+    await fetch("/api/auth/session", { method: "DELETE" });
+    window.location.href = "/";
+  }
 
   function renderNavItems(isMobile: boolean) {
     const itemClassName = isMobile ? "w-full justify-start" : "";
@@ -81,7 +85,7 @@ export function SiteHeader({ session }: SiteHeaderProps) {
             size="sm"
             variant="outline"
             className={cn("cursor-pointer", itemClassName)}
-            onClick={() => signOut({ callbackUrl: "/" })}
+            onClick={handleSignOut}
           >
             Sign out
           </Button>

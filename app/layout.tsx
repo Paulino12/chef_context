@@ -2,10 +2,9 @@ import "./globals.css";
 
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { getServerSession } from "next-auth";
 
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { SiteHeader } from "@/app/components/site-header";
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 
 export const metadata: Metadata = {
   title: "Chef Context",
@@ -27,7 +26,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerAccessSession();
 
   return (
     <html lang="en">
@@ -37,7 +36,7 @@ export default async function RootLayout({
         <div className="min-h-screen">
           <SiteHeader
             session={
-              session?.user
+              session
                 ? {
                     name: session.user.name,
                     email: session.user.email,

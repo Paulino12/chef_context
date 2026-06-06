@@ -2,8 +2,7 @@
 // Uses edge-compatible fetch with streaming FormData passthrough.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 
 const BACKEND_URL = process.env.INVOICE_BACKEND_URL!; // e.g. https://your-service.onrender.com
 const API_KEY = process.env.INVOICE_BACKEND_KEY || ""; // optional
@@ -11,7 +10,7 @@ const API_KEY = process.env.INVOICE_BACKEND_KEY || ""; // optional
 export const runtime = "nodejs"; // ensure Node runtime for FormData/file
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerAccessSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
 
   try {

@@ -1,7 +1,7 @@
 // app/api/budget-analyzer/route.ts
 //
 // Budget Analyzer proxy route (Next.js -> FastAPI backend).
-// - Uses NextAuth session check (same pattern as invoice-analyzer route.ts)
+// - Uses Supabase session check (same pattern as invoice-analyzer route.ts)
 // - Accepts multipart/form-data with:
 //    - file: File (required)
 //    - kind: "outstanding-orders" | "invoices" (optional; defaults to "outstanding-orders")
@@ -14,8 +14,7 @@
 // while the Python backend does the heavy parsing work.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 
 // Use separate env vars so invoice analyzer + budget analyzer can evolve independently.
 const BACKEND_URL = process.env.BUDGET_BACKEND_URL!; // e.g. https://your-budget-service.onrender.com
@@ -41,7 +40,7 @@ function normalizeKind(v: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerAccessSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
 
   try {

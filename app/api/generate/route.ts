@@ -1,10 +1,9 @@
 export const runtime = "nodejs";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerAccessSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
   const api = process.env.FASTAPI_URL!;
   const target = api.replace(/\/+$/, "") + "/generate";

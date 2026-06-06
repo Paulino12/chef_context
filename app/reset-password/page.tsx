@@ -1,0 +1,235 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
+
+import { fadeUp } from "@/app/lib/motion";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  clearServerAuthSession,
+  createSupabaseBrowserClient,
+  isSupabaseBrowserConfigured,
+} from "@/lib/supabase/browserClient";
+
+function Notice({
+  variant,
+  children,
+}: {
+  variant: "success" | "error" | "neutral";
+  children: React.ReactNode;
+}) {
+  const className =
+    variant === "success"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+      : variant === "error"
+        ? "border-destructive/30 bg-destructive/10 text-destructive"
+        : "border-border bg-muted/60 text-muted-foreground";
+
+  return <div className={`rounded-lg border px-3 py-2 text-sm ${className}`}>{children}</div>;
+}
+
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const reduced = useReducedMotion();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+    let mounted = true;
+
+    async function hydrateRecoverySessionFromHash() {
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      if (!hash) return;
+
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get("access_token")?.trim() ?? "";
+      const refreshToken = params.get("refresh_token")?.trim() ?? "";
+      const expiresAtRaw = params.get("expires_at")?.trim() ?? "";
+      const flowType = params.get("type")?.trim() ?? "";
+
+      if (!accessToken || !refreshToken || flowType !== "recovery") return;
+
+      const expiresAt = Number(expiresAtRaw);
+      const { error: sessionError } = await client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (!mounted) return;
+
+      if (sessionError) {
+        setError(sessionError.message || "The reset link is invalid or has expired.");
+        return;
+      }
+
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          expires_at: Number.isFinite(expiresAt) ? expiresAt : null,
+        }),
+      });
+
+      setSessionReady(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if ((event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") && session) {
+        setSessionReady(true);
+      }
+    });
+
+    client.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      if (data.session) setSessionReady(true);
+    });
+    void hydrateRecoverySessionFromHash();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+
+    if (!supabase || !isSupabaseBrowserConfigured()) {
+      setError(
+        "Missing Supabase env config. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Use at least 8 characters for the new password.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(updateError.message || "Unable to update password.");
+        return;
+      }
+
+      await clearServerAuthSession();
+      await supabase.auth.signOut();
+      setMessage("Password updated. Redirecting to sign in.");
+      window.setTimeout(() => {
+        router.push("/signin?reset=success");
+      }, 1200);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto max-w-xl px-4 pb-16 pt-10 sm:px-6">
+      <motion.div initial="hidden" animate="show" variants={fadeUp(reduced)}>
+        <Card className="surface-panel border-white/40">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-3xl">Set new password</CardTitle>
+            <CardDescription>
+              Use the reset link from your email, then choose a new password.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!sessionReady ? (
+              <Notice variant="neutral">
+                Open this page from the password reset email. If the link expired,
+                request a new reset from{" "}
+                <Link href="/signin" className="link-hover font-medium text-foreground">
+                  sign in
+                </Link>
+                .
+              </Notice>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium" htmlFor="password">
+                    New password
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Minimum 8 characters"
+                    required
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label
+                    className="block text-sm font-medium"
+                    htmlFor="confirmPassword"
+                  >
+                    Confirm password
+                  </label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Repeat your new password"
+                    required
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="submit" disabled={loading} aria-busy={loading || undefined}>
+                    {loading ? "Saving..." : "Update password"}
+                  </Button>
+                  <Link href="/signin" className="link-hover text-sm">
+                    Back to sign in
+                  </Link>
+                </div>
+              </form>
+            )}
+
+            {message ? <Notice variant="success">{message}</Notice> : null}
+            {error ? <Notice variant="error">{error}</Notice> : null}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </main>
+  );
+}
