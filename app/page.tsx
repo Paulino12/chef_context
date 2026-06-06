@@ -1,111 +1,96 @@
 "use client";
 
-// app/page.tsx
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+
+import ToolCard from "@/app/components/tool-card";
+import { TOOLS } from "@/app/lib/tools";
+import { fadeUp } from "@/app/lib/motion";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { TOOLS } from "./lib/tools";
-import ToolCard from "./components/tool-card";
-import { fadeUp } from "./lib/motion";
 
 export default function Home() {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <main className="relative min-h-[100dvh] bg-gradient-to-b from-background via-background to-muted/40">
-      <section className="mx-auto flex max-w-6xl flex-col items-center px-6 pb-20 pt-24 text-center sm:pt-28">
-        {/* Badge */}
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={fadeUp(prefersReducedMotion)}
-          className="mb-5 inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs text-muted-foreground backdrop-blur"
-        >
-          <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          Production-ready tools
-        </motion.div>
+    <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
+      <motion.section
+        initial="hidden"
+        animate="show"
+        variants={fadeUp(prefersReducedMotion)}
+        className="surface-panel overflow-hidden rounded-xl border border-white/40 shadow-xl shadow-black/5"
+      >
+        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] lg:items-end">
+          <div className="max-w-2xl space-y-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-border/70 bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+                Head chef tools
+              </span>
+              <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs text-muted-foreground">
+                Scalable workspace
+              </span>
+            </div>
 
-        {/* Title */}
-        <motion.h1
-          variants={fadeUp(prefersReducedMotion)}
-          initial="hidden"
-          animate="show"
-          className="text-balance bg-gradient-to-b from-foreground to-foreground/80 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl md:text-6xl"
-        >
-          Chef Context
-        </motion.h1>
+            <div className="space-y-4">
+              <h1 className="max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
+                Chef Context
+              </h1>
+              <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+                A single workspace for the chef tools you use now, and the
+                ones you add next.
+              </p>
+            </div>
 
-        {/* Subtitle */}
-        <motion.p
-          variants={fadeUp(prefersReducedMotion)}
-          initial="hidden"
-          animate="show"
-          className="mt-4 max-w-2xl text-pretty text-muted-foreground sm:text-lg"
-        >
-          Your control room for Chefs: create daily menus and analyze supplier
-          invoices — fast, accurate, and audit-friendly.
-        </motion.p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href="/dashboard">Open dashboard</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/signin">Sign in</Link>
+              </Button>
+            </div>
+          </div>
 
-        {/* CTA buttons */}
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={fadeUp(prefersReducedMotion)}
-          className="mt-8 flex flex-col items-center gap-3 sm:flex-row"
-        >
-          <Button asChild size="lg" className="px-6">
-            <Link href="/dashboard">Open Dashboard</Link>
-          </Button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TOOLS.slice(0, 2).map((tool) => (
+              <div
+                key={tool.id}
+                className="rounded-xl border border-border/70 bg-background/75 p-4 shadow-sm"
+              >
+                <p className="text-sm font-medium">{tool.title}</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {tool.detail}
+                </p>
+              </div>
+            ))}
+            <div className="rounded-xl border border-primary/20 bg-secondary/70 p-4 shadow-sm sm:col-span-2">
+              <p className="text-sm font-medium">Recipe Platform</p>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Connected as a launch card for the wider tools ecosystem.
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
 
-          <Button asChild size="lg" variant="outline" className="px-6">
-            <Link
-              href="https://github.com/Paulino12/generate-menus#readme"
-              target="_blank"
-            >
-              View Docs
-            </Link>
-          </Button>
-        </motion.div>
-
-        {/* Divider */}
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={fadeUp(prefersReducedMotion)}
-          className="mt-10 w-full max-w-3xl"
-        >
-          <Separator />
-        </motion.div>
-
-        {/* Feature cards (quick links) */}
-        <motion.div
-          variants={fadeUp(prefersReducedMotion)}
-          initial="hidden"
-          animate="show"
-          className="mt-10 grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-2"
-        >
-          {TOOLS.map((tool) => (
-            <ToolCard
-              key={tool.id}
-              title={tool.title}
-              detail={tool.detail}
-              href={tool.href}
-              description={tool.description}
-            />
-          ))}
-        </motion.div>
-
-        {/* footer note */}
-        <motion.p
-          variants={fadeUp(prefersReducedMotion)}
-          initial="hidden"
-          animate="show"
-          className="mt-10 text-xs text-muted-foreground"
-        >
-          © 2025 by Paulino @ MaryOctav Digital
-        </motion.p>
-      </section>
+      <motion.section
+        initial="hidden"
+        animate="show"
+        variants={fadeUp(prefersReducedMotion)}
+        className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3"
+      >
+        {TOOLS.map((tool) => (
+          <ToolCard
+            key={tool.id}
+            title={tool.title}
+            detail={tool.detail}
+            href={tool.href}
+            description={tool.description}
+            cta={tool.cta}
+            external={tool.external}
+            status={tool.status}
+          />
+        ))}
+      </motion.section>
     </main>
   );
 }

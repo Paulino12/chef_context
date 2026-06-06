@@ -1,32 +1,52 @@
 import "./globals.css";
+
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import { getServerSession } from "next-auth";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { SiteHeader } from "@/app/components/site-header";
 
 export const metadata: Metadata = {
   title: "Chef Context",
   description: "Chef tools dashboard",
 };
 
-const montserrat = Montserrat({
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  variable: "--font-montserrat",
-  display: "swap",
-  weight: ["400", "600", "700", "800"],
 });
 
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getServerSession(authOptions);
+
   return (
-    <html lang="en" className="h-full">
-      {/* Make sure small devices scale properly */}
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
-
-      {/* h-full + min-h-[100svh] ensures children can stretch to viewport height */}
-      <body 
-      className={`h-full min-h-[100svh] bg-background font-sans antialiased ${montserrat.className}`}>
-        {children}
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen font-sans antialiased`}
+      >
+        <div className="min-h-screen">
+          <SiteHeader
+            session={
+              session?.user
+                ? {
+                    name: session.user.name,
+                    email: session.user.email,
+                  }
+                : null
+            }
+          />
+          {children}
+        </div>
       </body>
     </html>
   );

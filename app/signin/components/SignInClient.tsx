@@ -5,9 +5,15 @@ import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { fadeUp } from "../../lib/motion";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function SignInClient() {
   const sp = useSearchParams();
@@ -24,69 +30,49 @@ export default function SignInClient() {
       : null;
 
   return (
-    <main className="relative min-h-[100dvh] bg-gradient-to-b from-background via-background to-muted/40">
+    <main className="mx-auto max-w-xl px-4 pb-16 pt-10 sm:px-6">
       <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl"
-        initial="hidden"
-        animate="show"
-        variants={fadeUp(reduced)}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-purple-500/15 blur-3xl"
-        initial="hidden"
-        animate="show"
-        variants={fadeUp(reduced)}
-      />
-
-      <section className="mx-auto flex min-h-[100dvh] max-w-6xl items-center justify-center px-6 py-16">
-        <motion.div
           initial="hidden"
           animate="show"
           variants={fadeUp(reduced)}
-          className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-sm backdrop-blur"
         >
-          <div className="mb-4 text-center">
-            <Link href="/" className="text-2xl font-bold">
-              Chef Context
-            </Link>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Sign in to continue
-            </p>
-          </div>
+        <Card className="surface-panel border-white/40">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-3xl">Sign in</CardTitle>
+            <CardDescription>
+              Use your Chef Context account to open the tools dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {errorText ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {errorText}
+              </div>
+            ) : null}
 
-          <Separator className="my-4" />
-
-          {errorText ? (
-            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorText}
-            </div>
-          ) : null}
-
-          <div className="space-y-3">
             <Button
               onClick={() =>
-                signIn("google", { callbackUrl: "/dashboard", prompt: "select_account" })
+                signIn("google", {
+                  callbackUrl: "/dashboard",
+                  prompt: "select_account",
+                })
               }
-              className="cursor-pointer w-full transition-all duration-150 hover:shadow-md active:translate-y-[1px] active:scale-[0.98]"
+              className="w-full"
             >
-              <GoogleIcon className="mr-2 h-4 w-4" />
+              <GoogleIcon className="h-4 w-4" />
               Sign in with Google
             </Button>
-          </div>
 
-          <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p>
-              By continuing you agree to our{" "}
-              <Link href="/docs" className="underline underline-offset-4">
+            <p className="text-xs leading-5 text-muted-foreground">
+              By continuing you agree to the{" "}
+              <Link href="/docs" className="link-hover">
                 usage guidelines
               </Link>
               .
             </p>
-          </div>
-        </motion.div>
-      </section>
+          </CardContent>
+        </Card>
+      </motion.div>
     </main>
   );
 }

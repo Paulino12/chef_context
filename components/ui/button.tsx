@@ -20,7 +20,7 @@ const buttonVariants = cva(
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
         whilePressed:
-          "hover:shadow-md active:shadow-sm active:translate-y-[1px] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:active:translate-y-0 motion-reduce:active:scale-10",
+          "hover:shadow-md active:shadow-sm active:translate-y-[1px] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -53,7 +53,7 @@ function Button({
       data-slot="button"
       className={cn(
         buttonVariants({ variant, size, className }),
-        `hover:shadow-md active:shadow-sm active:translate-y-[1px] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:active:translate-y-0 motion-reduce:active:scale-10`
+        "hover:shadow-md active:shadow-sm active:translate-y-[1px] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100"
       )}
       {...props}
     />
