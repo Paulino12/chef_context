@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { fadeUp } from "@/app/lib/motion";
@@ -53,7 +53,6 @@ function Notice({
 }
 
 export default function SignInClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const reduced = useReducedMotion();
   const [email, setEmail] = useState("");
@@ -104,8 +103,7 @@ export default function SignInClient() {
       const nextPath = requestedNext.startsWith("/") ? requestedNext : "/dashboard";
       setRedirectingMessage(`Signed in successfully. ${getPostSignInStatus(nextPath)}`);
       shouldReleaseLoading = false;
-      router.push(nextPath);
-      router.refresh();
+      window.location.assign(nextPath);
     } finally {
       if (shouldReleaseLoading) setLoading(false);
     }

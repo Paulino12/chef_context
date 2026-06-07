@@ -1,6 +1,9 @@
 // app/signin/page.tsx (Server Component)
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
+
+import { getServerAccessSession } from "@/lib/supabase/serverSession";
 import SignInClient from "./components/SignInClient";
 
 export const metadata: Metadata = {
@@ -12,7 +15,24 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default function Page() {
+type PageProps = {
+  searchParams?: Promise<{
+    callbackUrl?: string | string[];
+  }>;
+};
+
+function getSafeCallbackUrl(callbackUrl: string | string[] | undefined) {
+  const value = Array.isArray(callbackUrl) ? callbackUrl[0] : callbackUrl;
+  return value?.startsWith("/") ? value : "/dashboard";
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const session = await getServerAccessSession();
+  if (session) {
+    const params = searchParams ? await searchParams : {};
+    redirect(getSafeCallbackUrl(params.callbackUrl));
+  }
+
   return (
     <Suspense
       fallback={
