@@ -41,7 +41,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import ProgressInfo from "@/app/components/ProgressInfo";
 import { LAYOUT } from "@/app/lib/ui";
+import { useAdaptiveProgress } from "@/hooks/useAdaptiveProgress";
 
 /* ----------------------------- Types & Helpers ----------------------------- */
 
@@ -177,7 +179,7 @@ function normalizeOutstandingTotals(
   }
 
   // Case 2: array rows
-  for (const item of raw as any[]) {
+  for (const item of raw) {
     if (!item || typeof item !== "object") continue;
 
     // backend shape: { supplier, value }
@@ -236,6 +238,12 @@ export default function BudgetAnalyzerUploads() {
 
   const [ooBusy, setOoBusy] = useState(false);
   const [ooErr, setOoErr] = useState<string | null>(null);
+  const {
+    remainingMs: ooRemainingMs,
+    percent: ooPercent,
+    busy: ooProgressBusy,
+    runWithETA: runOutstandingWithETA,
+  } = useAdaptiveProgress("budget-analyzer:outstanding-orders", 45_000);
 
   const [ooCentre, setOoCentre] = useState<string | null>(null);
   const [ooTotals, setOoTotals] = useState<TotalsRow[]>([]);
@@ -248,6 +256,12 @@ export default function BudgetAnalyzerUploads() {
 
   const [invBusy, setInvBusy] = useState(false);
   const [invErr, setInvErr] = useState<string | null>(null);
+  const {
+    remainingMs: invRemainingMs,
+    percent: invPercent,
+    busy: invProgressBusy,
+    runWithETA: runInvoicesWithETA,
+  } = useAdaptiveProgress("budget-analyzer:invoices", 60_000);
 
   const [invTotals, setInvTotals] = useState<InvoiceRow[]>([]);
   const [invGrandTotal, setInvGrandTotal] = useState<number | null>(null);
@@ -274,10 +288,10 @@ export default function BudgetAnalyzerUploads() {
    * Small helper to POST a file to our Next.js proxy route.
    * Keeps code DRY so both uploads use the exact same transport logic.
    */
-  async function postToBudgetAnalyzer(
+  async function postToBudgetAnalyzer<T>(
     kind: "outstanding-orders" | "invoices",
     file: File
-  ) {
+  ): Promise<T> {
     const fd = new FormData();
     fd.append("kind", kind);
     fd.append("file", file, file.name);
@@ -287,9 +301,9 @@ export default function BudgetAnalyzerUploads() {
       body: fd,
     });
 
-    const json = (await res.json().catch(() => ({}))) as any;
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) throw new Error(json?.error || `Server error (${res.status})`);
-    return json;
+    return json as T;
   }
 
   async function analyzeOutstandingOrders() {
@@ -304,10 +318,12 @@ export default function BudgetAnalyzerUploads() {
     setOoReportTotal(null);
 
     try {
-      const json = (await postToBudgetAnalyzer(
-        "outstanding-orders",
-        ooFile
-      )) as OutstandingOrdersResponse;
+      const json = await runOutstandingWithETA(() =>
+        postToBudgetAnalyzer<OutstandingOrdersResponse>(
+          "outstanding-orders",
+          ooFile
+        )
+      );
 
       console.log("Outstanding Orders analysis result:", json);
 
@@ -349,10 +365,9 @@ export default function BudgetAnalyzerUploads() {
     setInvGrandDifference(null);
 
     try {
-      const json = (await postToBudgetAnalyzer(
-        "invoices",
-        invFile
-      )) as InvoicesResponse;
+      const json = await runInvoicesWithETA(() =>
+        postToBudgetAnalyzer<InvoicesResponse>("invoices", invFile)
+      );
 
       console.log("Invoices analysis result:", json);
 
@@ -610,6 +625,13 @@ export default function BudgetAnalyzerUploads() {
                   {ooBusy ? "Analyzing…" : "Analyze PDF"}
                 </Button>
               </div>
+              {ooProgressBusy && (
+                <ProgressInfo
+                  label="Analyzing outstanding orders"
+                  percent={ooPercent}
+                  remainingMs={ooRemainingMs}
+                />
+              )}
             </div>
 
             {ooErr && <p className="text-sm text-red-600">{ooErr}</p>}
@@ -736,6 +758,13 @@ export default function BudgetAnalyzerUploads() {
                   Download Excel
                 </Button>
               </div>
+              {invProgressBusy && (
+                <ProgressInfo
+                  label="Analyzing invoices and credits"
+                  percent={invPercent}
+                  remainingMs={invRemainingMs}
+                />
+              )}
 
               {/* <Button
                 size="lg"

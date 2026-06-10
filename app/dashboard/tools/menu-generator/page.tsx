@@ -31,6 +31,7 @@
  */
 
 import { useMemo, useState, useEffect } from "react";
+import ProgressInfo from "@/app/components/ProgressInfo";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -48,14 +49,14 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { useAdaptiveProgress } from "@/hooks/useAdaptiveProgress";
 import { ChevronDownIcon } from "lucide-react";
 import { LAYOUT } from "@/app/lib/ui";
-import { motion, AnimatePresence, number } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -127,8 +128,14 @@ export default function MenuGeneratorPage() {
   // Calendar popover state (fallback if filename had no date)
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Downloading flag
-  const [downloading, setDownloading] = useState(false);
+  const menuEtaKey =
+    mode === "seven" ? "menu-generator:all-days" : "menu-generator:one-day";
+  const {
+    remainingMs: generateRemainingMs,
+    percent: generatePercent,
+    busy: generating,
+    runWithETA: runGenerateWithETA,
+  } = useAdaptiveProgress(menuEtaKey, mode === "seven" ? 90_000 : 45_000);
 
   /* ----------------------------- Derived week info ---------------------------- */
 
@@ -173,43 +180,41 @@ export default function MenuGeneratorPage() {
       fd.append("date", toYMDLocal(chosen));
     }
 
-    // Optional: attach an AbortController if you want to cancel on unmount
-    const ctrl = new AbortController();
-    setDownloading(true);
     try {
-      // POST to our Next.js API route → proxy to FastAPI
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        body: fd,
-        cache: "no-store", // defensive: prevents cached responses in prod
-        signal: ctrl.signal,
+      await runGenerateWithETA(async () => {
+        // POST to our Next.js API route → proxy to FastAPI
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          body: fd,
+          cache: "no-store", // defensive: prevents cached responses in prod
+        });
+
+        if (!res.ok) {
+          throw new Error((await res.text()) || "Generation failed");
+        }
+
+        // Try to use filename from headers; fallback to a simple default
+        const cd = res.headers.get("content-disposition");
+        const name =
+          filenameFromContentDisposition(cd) ??
+          (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
+
+        // Read blob and programmatically download it
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+
+        // Append to DOM so click is honored by all browsers
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        // Let the browser consume the blob URL, then revoke
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
-
-      if (!res.ok) {
-        throw new Error((await res.text()) || "Generation failed");
-      }
-
-      // Try to use filename from headers; fallback to a simple default
-      const cd = res.headers.get("content-disposition");
-      const name =
-        filenameFromContentDisposition(cd) ??
-        (mode === "seven" ? "Henbrook-all-days.zip" : "menus.zip");
-
-      // Read blob and programmatically download it
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-
-      // Append to DOM so click is honored by all browsers
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-
-      // Let the browser consume the blob URL, then revoke
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -218,23 +223,8 @@ export default function MenuGeneratorPage() {
           ? err
           : "Generation failed";
       alert(msg);
-    } finally {
-      setDownloading(false); // always flip the button back
     }
   };
-
-  const [onGoingTimer, setOnGoingTimer] = useState<number>(0);
-
-  useEffect(() => {
-    // stop at 3
-    if (!downloading) return;
-
-    const timerId: ReturnType<typeof setTimeout> = setTimeout(() => {
-      setOnGoingTimer((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearTimeout(timerId);
-  }, [downloading, onGoingTimer]);
 
   /* ---------------------------------- Render --------------------------------- */
 
@@ -376,10 +366,17 @@ export default function MenuGeneratorPage() {
             <Button
               className={`w-full cursor-pointer`}
               onClick={submit}
-              disabled={downloading}
+              disabled={generating}
             >
-              {downloading ? "Generating…" : "Generate"}
+              {generating ? "Generating..." : "Generate"}
             </Button>
+            {generating && (
+              <ProgressInfo
+                label="Generating menu pack"
+                percent={generatePercent}
+                remainingMs={generateRemainingMs}
+              />
+            )}
           </CardContent>
         </Card>
       </motion.main>
