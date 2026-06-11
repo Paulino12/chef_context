@@ -14,11 +14,12 @@ export function useAdaptiveProgress(etaKey: string, defaultMs = 60_000) {
 
   const percent = useMemo(() => {
     if (remainingMs === null || expectedMs <= 0) return 0;
+    if (remainingMs <= 0 && busy) return 95;
     return Math.min(
       100,
       Math.max(0, ((expectedMs - remainingMs) / expectedMs) * 100)
     );
-  }, [remainingMs, expectedMs]);
+  }, [remainingMs, expectedMs, busy]);
 
   const runWithETA = async <T,>(task: () => Promise<T>): Promise<T> => {
     setBusy(true);

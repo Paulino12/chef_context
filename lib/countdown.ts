@@ -14,7 +14,7 @@ export function startCountdown(
   onTick(expectedMs);
   const id: ReturnType<typeof setInterval> = setInterval(() => {
     const elapsed = now() - t0;
-    const remaining = Math.max(0, expectedMs - elapsed);
+    const remaining = expectedMs - elapsed;
     onTick(remaining);
   }, stepMs);
 

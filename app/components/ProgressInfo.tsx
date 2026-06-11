@@ -15,12 +15,16 @@ export default function ProgressInfo({
   label = "Working...",
   percent,
   remainingMs,
+  message,
 }: {
   label?: string;
   percent: number;
   remainingMs: number | null;
+  message?: string;
 }) {
   const pct = Math.round(Math.min(100, Math.max(0, percent)));
+  const isOverEstimate =
+    typeof remainingMs === "number" && remainingMs <= 0 && pct < 100;
 
   return (
     <div
@@ -32,10 +36,15 @@ export default function ProgressInfo({
         <span className="font-medium">{label}</span>
         {typeof remainingMs === "number" && (
           <span className="shrink-0 text-muted-foreground">
-            About {formatRemaining(remainingMs)} remaining
+            {isOverEstimate
+              ? "Still working..."
+              : `About ${formatRemaining(remainingMs)} remaining`}
           </span>
         )}
       </div>
+      {message && (
+        <p className="mb-2 text-xs text-muted-foreground">{message}</p>
+      )}
       <Progress value={pct} aria-label={label} />
     </div>
   );

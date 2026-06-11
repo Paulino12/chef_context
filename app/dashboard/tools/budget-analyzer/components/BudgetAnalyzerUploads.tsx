@@ -90,6 +90,14 @@ type InvoicesResponse = {
   error?: string;
 };
 
+type AnalyzeKind = "outstanding-orders" | "invoices";
+
+type BackendProgress = {
+  percent?: number;
+  message?: string;
+  remainingMs?: number | null;
+};
+
 // Currency formatter (same as invoice analyzer)
 const gbp = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -228,6 +236,100 @@ function sortRowsBySupplierOrder<T extends { Supplier: string }>(
   });
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizePercent(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  const asPercent = value > 0 && value <= 1 ? value * 100 : value;
+  return Math.min(100, Math.max(0, asPercent));
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readBackendProgress(value: unknown): BackendProgress | null {
+  if (!isRecord(value)) return null;
+
+  const percent = normalizePercent(value.progress ?? value.percent);
+  const message =
+    stringValue(value.message) ??
+    stringValue(value.detail) ??
+    stringValue(value.stage) ??
+    stringValue(value.status);
+
+  const seconds =
+    typeof value.estimatedRemainingSeconds === "number"
+      ? value.estimatedRemainingSeconds
+      : typeof value.remaining_seconds === "number"
+      ? value.remaining_seconds
+      : typeof value.eta_seconds === "number"
+      ? value.eta_seconds
+      : undefined;
+
+  if (percent === undefined && !message && seconds === undefined) return null;
+
+  return {
+    percent,
+    message,
+    remainingMs: seconds === undefined ? undefined : Math.max(0, seconds * 1000),
+  };
+}
+
+function getJobId(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const id = value.job_id ?? value.jobId ?? value.id;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+function getStatus(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  const status = value.status ?? value.state;
+  return typeof status === "string" ? status.trim().toLowerCase() : null;
+}
+
+function isCompleteStatus(status: string | null) {
+  return (
+    status === "complete" ||
+    status === "completed" ||
+    status === "done" ||
+    status === "success" ||
+    status === "succeeded"
+  );
+}
+
+function isFailedStatus(status: string | null) {
+  return status === "failed" || status === "error" || status === "cancelled";
+}
+
+function getErrorMessage(value: unknown, fallback: string) {
+  if (!isRecord(value)) return fallback;
+  return (
+    stringValue(value.error) ??
+    stringValue(value.detail) ??
+    stringValue(value.message) ??
+    fallback
+  );
+}
+
+function getJobResult<T>(value: unknown): T | null {
+  if (!isRecord(value)) return null;
+  const result = value.result ?? value.data ?? value.output;
+  if (isRecord(result)) return result as T;
+
+  if ("supplier_totals" in value || "totals" in value || "report_total" in value) {
+    return value as T;
+  }
+
+  return null;
+}
+
 /* -------------------------------- Component -------------------------------- */
 
 export default function BudgetAnalyzerUploads() {
@@ -238,6 +340,8 @@ export default function BudgetAnalyzerUploads() {
 
   const [ooBusy, setOoBusy] = useState(false);
   const [ooErr, setOoErr] = useState<string | null>(null);
+  const [ooBackendProgress, setOoBackendProgress] =
+    useState<BackendProgress | null>(null);
   const {
     remainingMs: ooRemainingMs,
     percent: ooPercent,
@@ -256,6 +360,8 @@ export default function BudgetAnalyzerUploads() {
 
   const [invBusy, setInvBusy] = useState(false);
   const [invErr, setInvErr] = useState<string | null>(null);
+  const [invBackendProgress, setInvBackendProgress] =
+    useState<BackendProgress | null>(null);
   const {
     remainingMs: invRemainingMs,
     percent: invPercent,
@@ -288,12 +394,55 @@ export default function BudgetAnalyzerUploads() {
    * Small helper to POST a file to our Next.js proxy route.
    * Keeps code DRY so both uploads use the exact same transport logic.
    */
+  async function pollBudgetAnalyzerJob<T>(
+    kind: AnalyzeKind,
+    jobId: string,
+    onProgress: (progress: BackendProgress | null) => void,
+    initialProgress?: unknown
+  ): Promise<T> {
+    onProgress(readBackendProgress(initialProgress));
+
+    const timeoutAt = Date.now() + 15 * 60_000;
+    while (Date.now() < timeoutAt) {
+      await sleep(1_500);
+
+      const res = await fetch(
+        `/api/budget-analyzer/jobs/${encodeURIComponent(
+          jobId
+        )}?kind=${encodeURIComponent(kind)}`,
+        { cache: "no-store" }
+      );
+      const json = (await res.json().catch(() => ({}))) as unknown;
+
+      if (!res.ok) {
+        throw new Error(getErrorMessage(json, `Job status error (${res.status})`));
+      }
+
+      onProgress(readBackendProgress(json));
+
+      const status = getStatus(json);
+      if (isFailedStatus(status)) {
+        throw new Error(getErrorMessage(json, "Analysis failed"));
+      }
+
+      if (isCompleteStatus(status)) {
+        const result = getJobResult<T>(json);
+        if (result) return result;
+        throw new Error("Analysis completed without a result payload.");
+      }
+    }
+
+    throw new Error("Analysis is taking longer than expected. Please try again.");
+  }
+
   async function postToBudgetAnalyzer<T>(
-    kind: "outstanding-orders" | "invoices",
-    file: File
+    kind: AnalyzeKind,
+    file: File,
+    onProgress: (progress: BackendProgress | null) => void
   ): Promise<T> {
     const fd = new FormData();
     fd.append("kind", kind);
+    fd.append("async", "true");
     fd.append("file", file, file.name);
 
     const res = await fetch("/api/budget-analyzer", {
@@ -301,8 +450,13 @@ export default function BudgetAnalyzerUploads() {
       body: fd,
     });
 
-    const json = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) throw new Error(json?.error || `Server error (${res.status})`);
+    const json = (await res.json().catch(() => ({}))) as unknown;
+    if (!res.ok) throw new Error(getErrorMessage(json, `Server error (${res.status})`));
+
+    const jobId = getJobId(json);
+    if (jobId) return pollBudgetAnalyzerJob<T>(kind, jobId, onProgress, json);
+
+    onProgress(null);
     return json as T;
   }
 
@@ -311,6 +465,7 @@ export default function BudgetAnalyzerUploads() {
 
     setOoBusy(true);
     setOoErr(null);
+    setOoBackendProgress(null);
 
     // reset results
     setOoCentre(null);
@@ -321,7 +476,8 @@ export default function BudgetAnalyzerUploads() {
       const json = await runOutstandingWithETA(() =>
         postToBudgetAnalyzer<OutstandingOrdersResponse>(
           "outstanding-orders",
-          ooFile
+          ooFile,
+          setOoBackendProgress
         )
       );
 
@@ -349,6 +505,7 @@ export default function BudgetAnalyzerUploads() {
       setOoErr(msg);
     } finally {
       setOoBusy(false);
+      setOoBackendProgress(null);
     }
   }
 
@@ -357,6 +514,7 @@ export default function BudgetAnalyzerUploads() {
 
     setInvBusy(true);
     setInvErr(null);
+    setInvBackendProgress(null);
 
     // reset results
     setInvTotals([]);
@@ -366,7 +524,11 @@ export default function BudgetAnalyzerUploads() {
 
     try {
       const json = await runInvoicesWithETA(() =>
-        postToBudgetAnalyzer<InvoicesResponse>("invoices", invFile)
+        postToBudgetAnalyzer<InvoicesResponse>(
+          "invoices",
+          invFile,
+          setInvBackendProgress
+        )
       );
 
       console.log("Invoices analysis result:", json);
@@ -407,6 +569,7 @@ export default function BudgetAnalyzerUploads() {
       setInvErr(msg);
     } finally {
       setInvBusy(false);
+      setInvBackendProgress(null);
     }
   }
 
@@ -628,8 +791,13 @@ export default function BudgetAnalyzerUploads() {
               {ooProgressBusy && (
                 <ProgressInfo
                   label="Analyzing outstanding orders"
-                  percent={ooPercent}
-                  remainingMs={ooRemainingMs}
+                  percent={ooBackendProgress?.percent ?? ooPercent}
+                  remainingMs={
+                    ooBackendProgress
+                      ? ooBackendProgress.remainingMs ?? null
+                      : ooRemainingMs
+                  }
+                  message={ooBackendProgress?.message}
                 />
               )}
             </div>
@@ -761,8 +929,13 @@ export default function BudgetAnalyzerUploads() {
               {invProgressBusy && (
                 <ProgressInfo
                   label="Analyzing invoices and credits"
-                  percent={invPercent}
-                  remainingMs={invRemainingMs}
+                  percent={invBackendProgress?.percent ?? invPercent}
+                  remainingMs={
+                    invBackendProgress
+                      ? invBackendProgress.remainingMs ?? null
+                      : invRemainingMs
+                  }
+                  message={invBackendProgress?.message}
                 />
               )}
 

@@ -63,6 +63,8 @@ export async function POST(req: NextRequest) {
     // (and avoid leaking other fields you may add later).
     const fdata = new FormData();
     fdata.append("file", file, file.name);
+    const asyncMode = formData.get("async");
+    if (typeof asyncMode === "string") fdata.append("async", asyncMode);
 
     const res = await fetch(`${BACKEND_URL}${path}`, {
       method: "POST",
