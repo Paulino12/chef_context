@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import { MealLibraryPagination } from "@/components/meal-library-pagination";
 
 type Dish = {
   id: string;
@@ -83,6 +83,24 @@ async function read(params: Record<string, string>, signal?: AbortSignal) {
   return body;
 }
 
+function useResultCount(params: Record<string, string> | null) {
+  // Exclude the current page so navigation reuses the count for these filters.
+  const key = params ? JSON.stringify({ ...params, page: "0", count_pages: "true" }) : "";
+  const [count, setCount] = useState<{ key: string; pages: number; items: number } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    const controller = new AbortController();
+    read(JSON.parse(key), controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setCount({ key, pages: data.total_pages, items: data.total_items });
+      })
+      // Page navigation remains usable if counting is temporarily unavailable.
+      .catch(() => {});
+    return () => controller.abort();
+  }, [key]);
+  return count?.key === key ? count : undefined;
+}
+
 export default function MealLibrary() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [view, setView] = useState("meals");
@@ -108,6 +126,12 @@ export default function MealLibrary() {
   const [historyPage, setHistoryPage] = useState(0);
   const [historyError, setHistoryError] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
+  const resultCount = useResultCount(params);
+  const historyCount = useResultCount(detail ? {
+    action: "appearances",
+    dish_id: detail.id,
+    alternatives: params.alternatives || "false",
+  } : null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -375,8 +399,10 @@ export default function MealLibrary() {
             ? "Loading library…"
             : error ||
               (results?.items.length
-                ? `Page ${(results?.page || 0) + 1}`
-                : "No matching records. Try a broader search.")}
+                ? `${resultCount ? `${resultCount.items.toLocaleString()} matching records · ` : ""}Page ${results.page + 1}${resultCount ? ` of ${resultCount.pages}` : ""}`
+                : Number(params.page) > 0
+                  ? `No records on page ${Number(params.page) + 1}. Choose an earlier page.`
+                  : "0 matching records. Try a broader search.")}
         </div>
         <label className="flex items-center gap-2 text-sm">
           Rows per page
@@ -524,32 +550,20 @@ export default function MealLibrary() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <span className="text-sm text-muted-foreground">
               {results.items.length
-                ? `${results.page * pageSize + 1}–${results.page * pageSize + results.items.length} shown`
+                ? `${results.page * pageSize + 1}–${results.page * pageSize + results.items.length}${resultCount ? ` of ${resultCount.items.toLocaleString()} records` : " shown"}`
                 : "0 records"}{" "}
               · {pageSize} per page
             </span>
-            <div className="flex gap-2">
-              <button
-                className={button}
-                disabled={!results.page}
-                onClick={() => {
-                  setLoading(true);
-                  setParams({ ...params, page: String(results.page - 1) });
-                }}
-              >
-                Previous
-              </button>
-              <button
-                className={button}
-                disabled={!results.has_more}
-                onClick={() => {
-                  setLoading(true);
-                  setParams({ ...params, page: String(results.page + 1) });
-                }}
-              >
-                Next
-              </button>
-            </div>
+            <MealLibraryPagination
+              label="Library results pages"
+              page={results.page}
+              hasMore={results.has_more}
+              totalPages={resultCount?.pages}
+              onPageChange={(page) => {
+                setLoading(true);
+                setParams({ ...params, page: String(page) });
+              }}
+            />
           </div>
         </section>
       )}
@@ -589,22 +603,30 @@ export default function MealLibrary() {
             </article>
           ))}
           {history && (
-            <div className="flex gap-3">
-              <button
-                className={button}
-                disabled={!historyPage}
-                onClick={() => setHistoryPage(historyPage - 1)}
-              >
-                Earlier page
-              </button>
-              <button
-                className={button}
-                disabled={!history.has_more}
-                onClick={() => setHistoryPage(historyPage + 1)}
-              >
-                More history
-              </button>
-            </div>
+            <>
+              {historyCount && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {historyCount.items.toLocaleString()} matching menu listings
+                  {historyCount.pages > 0 ? ` · Page ${historyPage + 1} of ${historyCount.pages}` : ""}
+                </p>
+              )}
+              {!history.items.length && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  No history on page {historyPage + 1}.
+                  {historyPage > 0 ? " Choose an earlier page." : ""}
+                </p>
+              )}
+              <MealLibraryPagination
+                label="Menu history pages"
+                page={historyPage}
+                hasMore={history.has_more}
+                totalPages={historyCount?.pages}
+                onPageChange={(page) => {
+                  setHistory(null);
+                  setHistoryPage(page);
+                }}
+              />
+            </>
           )}
         </section>
       )}
