@@ -20,7 +20,7 @@ export const TOOLS: Tool[] = [
     description: "Paste a weekly menu, review choices and allergens, and download a formatted Word document.",
     href: "/dashboard/tools/weekly-menu-generator",
     cta: "Create weekly menu",
-    status: "Ready to connect",
+    status: "Live",
   },
   {
     id: 4,
