@@ -85,14 +85,21 @@ async function read(params: Record<string, string>, signal?: AbortSignal) {
 
 function useResultCount(params: Record<string, string> | null) {
   // Exclude the current page so navigation reuses the count for these filters.
-  const key = params ? JSON.stringify({ ...params, page: "0", count_pages: "true" }) : "";
-  const [count, setCount] = useState<{ key: string; pages: number; items: number } | null>(null);
+  const key = params
+    ? JSON.stringify({ ...params, page: "0", count_pages: "true" })
+    : "";
+  const [count, setCount] = useState<{
+    key: string;
+    pages: number;
+    items: number;
+  } | null>(null);
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     read(JSON.parse(key), controller.signal)
       .then((data) => {
-        if (!controller.signal.aborted) setCount({ key, pages: data.total_pages, items: data.total_items });
+        if (!controller.signal.aborted)
+          setCount({ key, pages: data.total_pages, items: data.total_items });
       })
       // Page navigation remains usable if counting is temporarily unavailable.
       .catch(() => {});
@@ -127,11 +134,15 @@ export default function MealLibrary() {
   const [historyError, setHistoryError] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
   const resultCount = useResultCount(params);
-  const historyCount = useResultCount(detail ? {
-    action: "appearances",
-    dish_id: detail.id,
-    alternatives: params.alternatives || "false",
-  } : null);
+  const historyCount = useResultCount(
+    detail
+      ? {
+          action: "appearances",
+          dish_id: detail.id,
+          alternatives: params.alternatives || "false",
+        }
+      : null,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -607,7 +618,9 @@ export default function MealLibrary() {
               {historyCount && (
                 <p role="status" className="text-sm text-muted-foreground">
                   {historyCount.items.toLocaleString()} matching menu listings
-                  {historyCount.pages > 0 ? ` · Page ${historyPage + 1} of ${historyCount.pages}` : ""}
+                  {historyCount.pages > 0
+                    ? ` · Page ${historyPage + 1} of ${historyCount.pages}`
+                    : ""}
                 </p>
               )}
               {!history.items.length && (
