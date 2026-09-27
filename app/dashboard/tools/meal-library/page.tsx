@@ -2,6 +2,7 @@
 
 import { Fragment, FormEvent, useEffect, useState } from "react";
 import { MealLibraryPagination } from "@/components/meal-library-pagination";
+import { MealHistorySkeleton, MealLibrarySkeleton } from "@/components/meal-library-skeleton";
 
 type Dish = {
   id: string;
@@ -90,22 +91,33 @@ function useResultCount(params: Record<string, string> | null) {
     : "";
   const [count, setCount] = useState<{
     key: string;
-    pages: number;
-    items: number;
+    data?: { pages: number; items: number };
+    error?: string;
   } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     read(JSON.parse(key), controller.signal)
       .then((data) => {
         if (!controller.signal.aborted)
-          setCount({ key, pages: data.total_pages, items: data.total_items });
+          setCount({ key, data: { pages: data.total_pages, items: data.total_items } });
       })
-      // Page navigation remains usable if counting is temporarily unavailable.
-      .catch(() => {});
+      .catch((error) => {
+        if (!controller.signal.aborted) setCount({ key, error: error.message });
+      });
     return () => controller.abort();
-  }, [key]);
-  return count?.key === key ? count : undefined;
+  }, [key, attempt]);
+  const current = count?.key === key ? count : undefined;
+  return {
+    count: current?.data,
+    loading: Boolean(key) && !current,
+    error: current?.error,
+    retry: () => {
+      setCount(null);
+      setAttempt((value) => value + 1);
+    },
+  };
 }
 
 export default function MealLibrary() {
@@ -133,8 +145,8 @@ export default function MealLibrary() {
   const [historyPage, setHistoryPage] = useState(0);
   const [historyError, setHistoryError] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
-  const resultCount = useResultCount(params);
-  const historyCount = useResultCount(
+  const resultTotals = useResultCount(params);
+  const historyTotals = useResultCount(
     detail
       ? {
           action: "appearances",
@@ -143,6 +155,16 @@ export default function MealLibrary() {
         }
       : null,
   );
+  const resultCount = resultTotals.count;
+  const historyCount = historyTotals.count;
+  // Reveal the rows and their pagination together, regardless of which request
+  // finishes first. A failed count settles too, so it cannot leave a spinner.
+  const resultsLoading = loading || (!error && resultTotals.loading);
+  const historyLoading = !history || (!historyError && historyTotals.loading);
+  const tableColumns = (view === "meals"
+    ? ["Dish", "Menu label", "Weeks listed", "Last listed", "History"]
+    : [...(columns[params.table] || ["id"]), "Details"]
+  ).map(titleCase);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -192,9 +214,11 @@ export default function MealLibrary() {
       },
       controller.signal,
     )
-      .then(setHistory)
+      .then((data) => {
+        if (!controller.signal.aborted) setHistory(data);
+      })
       .catch((e) => {
-        if (e.name !== "AbortError") setHistoryError(e.message);
+        if (!controller.signal.aborted) setHistoryError(e.message);
       });
     return () => controller.abort();
   }, [detail, historyPage, params.alternatives]);
@@ -394,7 +418,7 @@ export default function MealLibrary() {
         )}
         <button
           className={`${button} bg-primary text-primary-foreground`}
-          disabled={loading}
+          disabled={resultsLoading}
         >
           Search
         </button>
@@ -404,10 +428,14 @@ export default function MealLibrary() {
             : "All original records are retained here, including earlier versions, source details, planning rules and review notes."}
         </p>
       </form>
+      <section aria-label="Library results" aria-busy={resultsLoading} className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div role="status" aria-live="polite">
-          {loading
-            ? "Loading library…"
+        <div role="status" aria-live="polite" className="min-h-6">
+          {resultsLoading
+            ? <>
+                <span className="sr-only">Loading library results and totals…</span>
+                <div aria-hidden="true" className="h-5 w-64 max-w-full rounded bg-muted motion-safe:animate-pulse" />
+              </>
             : error ||
               (results?.items.length
                 ? `${resultCount ? `${resultCount.items.toLocaleString()} matching records · ` : ""}Page ${results.page + 1}${resultCount ? ` of ${resultCount.pages}` : ""}`
@@ -434,8 +462,22 @@ export default function MealLibrary() {
           </select>
         </label>
       </div>
-      {!loading && results && (
+      {resultsLoading && (
+        <MealLibrarySkeleton
+          rows={Math.min(pageSize, results?.items.length || pageSize)}
+          columns={tableColumns}
+        />
+      )}
+      {!resultsLoading && results && (
         <section className="space-y-3">
+          {resultTotals.error && (
+            <div role="status" className="flex flex-wrap items-center gap-2 text-sm">
+              <span>Total count unavailable.</span>
+              <button type="button" className={button} onClick={resultTotals.retry}>
+                Retry totals
+              </button>
+            </div>
+          )}
           <div className="overflow-x-auto rounded-xl border bg-background">
             <table className="w-full text-sm text-left">
               <caption className="sr-only">
@@ -446,22 +488,13 @@ export default function MealLibrary() {
               </caption>
               <thead className="sticky top-0 bg-secondary z-10 text-secondary-foreground">
                 <tr>
-                  {(view === "meals"
-                    ? [
-                        "Dish",
-                        "Menu label",
-                        "Weeks listed",
-                        "Last listed",
-                        "History",
-                      ]
-                    : [...(columns[params.table] || ["id"]), "Details"]
-                  ).map((label) => (
+                  {tableColumns.map((label) => (
                     <th
                       key={label}
                       scope="col"
                       className="px-4 py-3 font-semibold whitespace-nowrap"
                     >
-                      {titleCase(label)}
+                      {label}
                     </th>
                   ))}
                 </tr>
@@ -495,6 +528,10 @@ export default function MealLibrary() {
                           className={button}
                           aria-label={`View history for ${text(row.name)}`}
                           onClick={() => {
+                            if (detail?.id !== row.id || historyPage !== 0) {
+                              setHistory(null);
+                              setHistoryError("");
+                            }
                             setDetail(row as Dish);
                             setHistoryPage(0);
                           }}
@@ -578,10 +615,12 @@ export default function MealLibrary() {
           </div>
         </section>
       )}
+      </section>
       {detail && (
         <section
           id="meal-history"
           aria-label="Menu history"
+          aria-busy={historyLoading && !historyError}
           className="rounded-xl border-2 border-primary p-5 space-y-4"
         >
           <div className="flex justify-between gap-3">
@@ -595,10 +634,15 @@ export default function MealLibrary() {
           <p className="text-sm text-muted-foreground">
             These are menu listings, not confirmation that a dish was served.
           </p>
-          {!history && (
-            <p role="status">{historyError || "Loading history…"}</p>
+          {historyLoading && (
+            historyError ? <p role="status">{historyError}</p> : (
+              <>
+                <p role="status" className="sr-only">Loading history and totals…</p>
+                <MealHistorySkeleton />
+              </>
+            )
           )}
-          {history?.items.map((row, i) => (
+          {!historyLoading && history?.items.map((row, i) => (
             <article key={i} className="border-t pt-3 space-y-1">
               <p className="font-semibold">
                 {date(row.service_date)} · {text(row.meal)} · {text(row.course)}
@@ -613,8 +657,16 @@ export default function MealLibrary() {
               </p>
             </article>
           ))}
-          {history && (
+          {!historyLoading && history && (
             <>
+              {historyTotals.error && (
+                <div role="status" className="flex flex-wrap items-center gap-2 text-sm">
+                  <span>Total count unavailable.</span>
+                  <button type="button" className={button} onClick={historyTotals.retry}>
+                    Retry totals
+                  </button>
+                </div>
+              )}
               {historyCount && (
                 <p role="status" className="text-sm text-muted-foreground">
                   {historyCount.items.toLocaleString()} matching menu listings
