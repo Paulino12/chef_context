@@ -14,6 +14,25 @@ export type Tool = {
 
 export const TOOLS: Tool[] = [
   {
+    id: 5,
+    title: "Weekly Menu Generator",
+    detail: "Menu text to Word",
+    description: "Paste a weekly menu, review choices and allergens, and download a formatted Word document.",
+    href: "/dashboard/tools/weekly-menu-generator",
+    cta: "Create weekly menu",
+    status: "Ready to connect",
+  },
+  {
+    id: 4,
+    title: "Meal Library",
+    detail: "Weekly menu archive",
+    description:
+      "Find previous meals, explore menu history and browse Henbrook's menu design rules.",
+    href: "/dashboard/tools/meal-library",
+    cta: "Explore meals",
+    status: "Read-only",
+  },
+  {
     id: 1,
     title: "Menu Generator",
     detail: "DOCX to ZIP",
