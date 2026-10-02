@@ -15,15 +15,6 @@ export type Tool = {
 export const TOOLS: Tool[] = [
   {
     id: 5,
-    title: "Weekly Menu Generator",
-    detail: "Menu text to Word",
-    description: "Paste a weekly menu, review choices and allergens, and download a formatted Word document.",
-    href: "/dashboard/tools/weekly-menu-generator",
-    cta: "Create weekly menu",
-    status: "Live",
-  },
-  {
-    id: 4,
     title: "Meal Library",
     detail: "Weekly menu archive",
     description:
@@ -33,8 +24,19 @@ export const TOOLS: Tool[] = [
     status: "Read-only",
   },
   {
+    id: 4,
+    title: "Weekly Menu Generator",
+    detail: "Menu text to Word",
+    description:
+      "Paste a weekly menu, review choices and allergens, and download a formatted Word document.",
+    href: "/dashboard/tools/weekly-menu-generator",
+    cta: "Create weekly menu",
+    status: "Live",
+  },
+
+  {
     id: 1,
-    title: "Menu Generator",
+    title: "Daily Menu Generator",
     detail: "DOCX to ZIP",
     description:
       "Upload your weekly menu and download a day-by-day pack ready to print and post.",
