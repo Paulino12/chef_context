@@ -48,7 +48,7 @@ export const TOOLS: Tool[] = [
     title: "Budget Analyzer",
     detail: "ZIP of .xlsx",
     description:
-      "Upload Saffron outstanding orders and invoices to get a comparative budget.",
+      "Upload awaiting orders and invoices to get a comparative budget.",
     href: "/dashboard/tools/budget-analyzer",
     status: "Live",
   },

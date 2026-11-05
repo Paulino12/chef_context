@@ -20,6 +20,10 @@
  */
 
 import * as React from "react";
+import AwaitingOrdersUpload, { type AwaitingOrdersResult } from "./AwaitingOrdersUpload";
+
+// Retain the legacy report workflow for later re-enabling.
+const SHOW_LEGACY_OUTSTANDING_ORDERS = false;
 import { useMemo, useRef, useState } from "react";
 import {
   Card,
@@ -145,7 +149,7 @@ function normalizeSupplierUiName(name: string): string {
  */
 function relabelBidfoodFromCentre(
   supplierName: string,
-  centre?: string
+  centre?: string,
 ): string {
   const name = supplierName.trim();
   if (name.toLowerCase() !== "bidfood") return name;
@@ -165,7 +169,7 @@ function relabelBidfoodFromCentre(
  */
 function normalizeOutstandingTotals(
   raw: ApiTotals | undefined,
-  centre?: string
+  centre?: string,
 ): TotalsRow[] {
   const rows: TotalsRow[] = [];
   if (!raw) return rows;
@@ -225,7 +229,7 @@ const CUSTOM_ORDER = [
 ] as const;
 
 function sortRowsBySupplierOrder<T extends { Supplier: string }>(
-  rows: T[]
+  rows: T[],
 ): T[] {
   const rank = new Map<string, number>(CUSTOM_ORDER.map((n, i) => [n, i]));
   return [...rows].sort((a, b) => {
@@ -268,17 +272,18 @@ function readBackendProgress(value: unknown): BackendProgress | null {
     typeof value.estimatedRemainingSeconds === "number"
       ? value.estimatedRemainingSeconds
       : typeof value.remaining_seconds === "number"
-      ? value.remaining_seconds
-      : typeof value.eta_seconds === "number"
-      ? value.eta_seconds
-      : undefined;
+        ? value.remaining_seconds
+        : typeof value.eta_seconds === "number"
+          ? value.eta_seconds
+          : undefined;
 
   if (percent === undefined && !message && seconds === undefined) return null;
 
   return {
     percent,
     message,
-    remainingMs: seconds === undefined ? undefined : Math.max(0, seconds * 1000),
+    remainingMs:
+      seconds === undefined ? undefined : Math.max(0, seconds * 1000),
   };
 }
 
@@ -323,7 +328,11 @@ function getJobResult<T>(value: unknown): T | null {
   const result = value.result ?? value.data ?? value.output;
   if (isRecord(result)) return result as T;
 
-  if ("supplier_totals" in value || "totals" in value || "report_total" in value) {
+  if (
+    "supplier_totals" in value ||
+    "totals" in value ||
+    "report_total" in value
+  ) {
     return value as T;
   }
 
@@ -333,6 +342,7 @@ function getJobResult<T>(value: unknown): T | null {
 /* -------------------------------- Component -------------------------------- */
 
 export default function BudgetAnalyzerUploads() {
+  const [awaitingOrders, setAwaitingOrders] = useState<AwaitingOrdersResult | null>(null);
   /* -------------------------- Outstanding Orders state -------------------------- */
   const [ooFile, setOoFile] = useState<File | null>(null);
   const ooFileRef = useRef<HTMLInputElement>(null);
@@ -373,7 +383,7 @@ export default function BudgetAnalyzerUploads() {
   const [invGrandTotal, setInvGrandTotal] = useState<number | null>(null);
   const [invGrandCredits, setInvGrandCredits] = useState<number | null>(null);
   const [invGrandDifference, setInvGrandDifference] = useState<number | null>(
-    null
+    null,
   );
 
   // --------------------------- Budget analysis inputs ---------------------------
@@ -398,7 +408,7 @@ export default function BudgetAnalyzerUploads() {
     kind: AnalyzeKind,
     jobId: string,
     onProgress: (progress: BackendProgress | null) => void,
-    initialProgress?: unknown
+    initialProgress?: unknown,
   ): Promise<T> {
     onProgress(readBackendProgress(initialProgress));
 
@@ -408,14 +418,16 @@ export default function BudgetAnalyzerUploads() {
 
       const res = await fetch(
         `/api/budget-analyzer/jobs/${encodeURIComponent(
-          jobId
+          jobId,
         )}?kind=${encodeURIComponent(kind)}`,
-        { cache: "no-store" }
+        { cache: "no-store" },
       );
       const json = (await res.json().catch(() => ({}))) as unknown;
 
       if (!res.ok) {
-        throw new Error(getErrorMessage(json, `Job status error (${res.status})`));
+        throw new Error(
+          getErrorMessage(json, `Job status error (${res.status})`),
+        );
       }
 
       onProgress(readBackendProgress(json));
@@ -432,13 +444,15 @@ export default function BudgetAnalyzerUploads() {
       }
     }
 
-    throw new Error("Analysis is taking longer than expected. Please try again.");
+    throw new Error(
+      "Analysis is taking longer than expected. Please try again.",
+    );
   }
 
   async function postToBudgetAnalyzer<T>(
     kind: AnalyzeKind,
     file: File,
-    onProgress: (progress: BackendProgress | null) => void
+    onProgress: (progress: BackendProgress | null) => void,
   ): Promise<T> {
     const fd = new FormData();
     fd.append("kind", kind);
@@ -451,7 +465,8 @@ export default function BudgetAnalyzerUploads() {
     });
 
     const json = (await res.json().catch(() => ({}))) as unknown;
-    if (!res.ok) throw new Error(getErrorMessage(json, `Server error (${res.status})`));
+    if (!res.ok)
+      throw new Error(getErrorMessage(json, `Server error (${res.status})`));
 
     const jobId = getJobId(json);
     if (jobId) return pollBudgetAnalyzerJob<T>(kind, jobId, onProgress, json);
@@ -477,8 +492,8 @@ export default function BudgetAnalyzerUploads() {
         postToBudgetAnalyzer<OutstandingOrdersResponse>(
           "outstanding-orders",
           ooFile,
-          setOoBackendProgress
-        )
+          setOoBackendProgress,
+        ),
       );
 
       console.log("Outstanding Orders analysis result:", json);
@@ -490,7 +505,7 @@ export default function BudgetAnalyzerUploads() {
         | undefined;
 
       const rows = sortRowsBySupplierOrder(
-        normalizeOutstandingTotals(rawTotals, centre)
+        normalizeOutstandingTotals(rawTotals, centre),
       );
 
       setOoCentre(centre || null);
@@ -527,8 +542,8 @@ export default function BudgetAnalyzerUploads() {
         postToBudgetAnalyzer<InvoicesResponse>(
           "invoices",
           invFile,
-          setInvBackendProgress
-        )
+          setInvBackendProgress,
+        ),
       );
 
       console.log("Invoices analysis result:", json);
@@ -547,10 +562,10 @@ export default function BudgetAnalyzerUploads() {
 
       setInvTotals(sorted);
       setInvGrandTotal(
-        json.grand_total != null ? toMoneyNumber(json.grand_total) : null
+        json.grand_total != null ? toMoneyNumber(json.grand_total) : null,
       );
       setInvGrandCredits(
-        json.grand_credits != null ? toMoneyNumber(json.grand_credits) : null
+        json.grand_credits != null ? toMoneyNumber(json.grand_credits) : null,
       );
 
       const backendDiff =
@@ -562,7 +577,7 @@ export default function BudgetAnalyzerUploads() {
       setInvGrandDifference(
         backendDiff != null
           ? backendDiff
-          : sorted.reduce((acc, r) => acc + (r.Difference ?? 0), 0)
+          : sorted.reduce((acc, r) => acc + (r.Difference ?? 0), 0),
       );
     } catch (e: unknown) {
       const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -602,7 +617,7 @@ export default function BudgetAnalyzerUploads() {
 
   const ooTotalFromRows = useMemo(
     () => ooTotals.reduce((acc, r) => acc + (r.Total ?? 0), 0),
-    [ooTotals]
+    [ooTotals],
   );
 
   // Prefer the report total (if provided), otherwise fall back to sum of rows
@@ -617,27 +632,34 @@ export default function BudgetAnalyzerUploads() {
   // If backend didn't provide grand totals, compute from table
   const invTotalFromRows = useMemo(
     () => invTotals.reduce((acc, r) => acc + (r.Total ?? 0), 0),
-    [invTotals]
+    [invTotals],
   );
   const invCreditsFromRows = useMemo(
     () => invTotals.reduce((acc, r) => acc + (r.Credits ?? 0), 0),
-    [invTotals]
+    [invTotals],
   );
   const invDifferenceFromRows = useMemo(
     () => invTotals.reduce((acc, r) => acc + (r.Difference ?? 0), 0),
-    [invTotals]
+    [invTotals],
   );
 
   const invDisplayedTotal = invGrandTotal ?? invTotalFromRows;
   const invDisplayedCredits = invGrandCredits ?? invCreditsFromRows;
   const invDisplayedDifference = invGrandDifference ?? invDifferenceFromRows;
 
-  // Simple comparison: outstanding (ordered) vs invoices (net payable)
+  const activeOrdersTotal = SHOW_LEGACY_OUTSTANDING_ORDERS
+    ? ooDisplayedTotal
+    : toMoneyNumber(awaitingOrders?.grand_total);
+  const hasOrders = SHOW_LEGACY_OUTSTANDING_ORDERS
+    ? ooTotals.length > 0
+    : awaitingOrders !== null;
+
+  // Compare the visible orders workflow with invoices (net payable).
   const variance = useMemo(() => {
     // "ordered" here is outstanding report total (real-time view of committed spend)
     // "invoiced (net)" is invoices total minus credits
-    return ooDisplayedTotal - invDisplayedDifference;
-  }, [ooDisplayedTotal, invDisplayedDifference]);
+    return activeOrdersTotal - invDisplayedDifference;
+  }, [activeOrdersTotal, invDisplayedDifference]);
 
   // --------------------------- Budget analysis derived ---------------------------
 
@@ -656,13 +678,13 @@ export default function BudgetAnalyzerUploads() {
   // Monthly budget = Residents × PRPD × Number of days
   const monthlyBudget = useMemo(
     () => residentsNum * prpdNum * numDaysNum,
-    [residentsNum, prpdNum, numDaysNum]
+    [residentsNum, prpdNum, numDaysNum],
   );
 
   // Current spend = Net payable invoices + Pleo
   const currentSpend = useMemo(
     () => (invDisplayedDifference ?? 0) + pleoSpendNum,
-    [invDisplayedDifference, pleoSpendNum]
+    [invDisplayedDifference, pleoSpendNum],
   );
 
   // % of budget = currentSpend / monthlyBudget
@@ -725,7 +747,7 @@ export default function BudgetAnalyzerUploads() {
         LAYOUT.SECTION_GAP,
       ].join(" ")}
     >
-      {ooTotals.length > 0 && invTotals.length > 0 && (
+      {hasOrders && invTotals.length > 0 && (
         <Button
           id="hidePrintButton"
           variant="secondary"
@@ -740,13 +762,15 @@ export default function BudgetAnalyzerUploads() {
         <CardHeader>
           <CardTitle>Budget Analyzer</CardTitle>
           <CardDescription id="hideTitleDescription">
-            Upload Outstanding Orders and Invoices/Credit Notes for comparisons.
+            Upload Awaiting Orders and Invoices/Credit Notes for comparisons.
           </CardDescription>
         </CardHeader>
 
         {/* Keep your side-by-side layout (stack on small screens) */}
         <CardContent className="space-y-6 flex flex-col md:flex-row gap-6 w-full">
-          {/* Outstanding Orders */}
+          {!SHOW_LEGACY_OUTSTANDING_ORDERS && <AwaitingOrdersUpload onResult={setAwaitingOrders} />}
+          {/* Legacy Outstanding Orders is preserved but hidden. */}
+          {SHOW_LEGACY_OUTSTANDING_ORDERS && (
           <div className="space-y-3 w-full md:w-1/2">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -794,7 +818,7 @@ export default function BudgetAnalyzerUploads() {
                   percent={ooBackendProgress?.percent ?? ooPercent}
                   remainingMs={
                     ooBackendProgress
-                      ? ooBackendProgress.remainingMs ?? null
+                      ? (ooBackendProgress.remainingMs ?? null)
                       : ooRemainingMs
                   }
                   message={ooBackendProgress?.message}
@@ -873,6 +897,8 @@ export default function BudgetAnalyzerUploads() {
             </CardFooter>
           </div>
 
+          )}
+
           {/* Invoices / Credit Notes */}
           <div className="space-y-3 w-full md:w-1/2 opacity-90">
             <div className="flex items-center justify-between gap-3">
@@ -932,7 +958,7 @@ export default function BudgetAnalyzerUploads() {
                   percent={invBackendProgress?.percent ?? invPercent}
                   remainingMs={
                     invBackendProgress
-                      ? invBackendProgress.remainingMs ?? null
+                      ? (invBackendProgress.remainingMs ?? null)
                       : invRemainingMs
                   }
                   message={invBackendProgress?.message}
@@ -1065,18 +1091,18 @@ export default function BudgetAnalyzerUploads() {
         <CardHeader>
           <CardTitle className="text-base">Comparison</CardTitle>
           <CardDescription>
-            Ordered (Outstanding) vs Invoiced (Net payable).
+            Awaiting Orders (incl. VAT) vs Invoiced (Net payable).
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {ooTotals.length > 0 && invTotals.length > 0 ? (
+          {hasOrders && invTotals.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-3">
               <Card>
                 <CardHeader className="p-3">
-                  <CardDescription>Ordered (Outstanding)</CardDescription>
+                  <CardDescription>Awaiting Orders (incl. VAT)</CardDescription>
                   <CardTitle className="text-2xl">
-                    {fmtGBP(ooDisplayedTotal)}
+                    {fmtGBP(activeOrdersTotal)}
                   </CardTitle>
                 </CardHeader>
               </Card>
@@ -1185,7 +1211,14 @@ export default function BudgetAnalyzerUploads() {
                     {fmtGBP(currentSpend)}
                   </TableCell>
                 </TableRow>
-
+                <TableRow>
+                  <TableCell className="whitespace-nowrap">
+                    Variance
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtGBP(monthlyBudget - currentSpend)}
+                  </TableCell>
+                </TableRow>
                 <TableRow className="font-semibold">
                   <TableCell className="whitespace-nowrap">
                     Current % of monthly budget

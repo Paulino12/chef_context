@@ -25,6 +25,7 @@ export const runtime = "nodejs"; // ensure Node runtime for FormData/file handli
 // Map UI "kind" -> backend endpoint.
 // Adjust these paths to match your FastAPI routes.
 const KIND_TO_PATH: Record<string, string> = {
+  "awaiting-orders": "/outstanding-orders/analyze",
   "outstanding-orders": "/outstanding-orders/summary",
   outstanding_orders: "/outstanding-orders/summary",
   outstanding: "/outstanding-orders/summary",
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
       // Backend should return { error: "..." }, but keep this defensive.
       const err = await res.json().catch(() => ({}));
       return NextResponse.json(
-        { error: err.error || "Backend error" },
+        { error: err.error || err.detail || "Backend error" },
         { status: res.status }
       );
     }
